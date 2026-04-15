@@ -1,0 +1,6 @@
+# GitHub repository settings for harden-sles15
+
+repository:
+  name: harden-sles15
+  description: SLES 15 Security Hardening Tool - Standalone binary with embedded Ansible
+  topics: [sles, suse, hardening, security, ansible, cis]
