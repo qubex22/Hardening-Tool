@@ -1,7 +1,7 @@
 # Build environment for harden-sles15
 # Based on SLES 15 with Go installed
 
-FROM registry.suse.com/bci/bci-spin:15.5
+FROM registry.suse.com/suse/ltss/sle15.6/bci-base:latest
 
 # Install Go and build dependencies
 RUN zypper -n install -y \
