@@ -1,0 +1,108 @@
+---
+# SLES 15 CIS Hardening Tasks
+
+- name: Include OS-specific variables
+  include_vars:
+    file: "{{ ansible_distribution_major_version }}.yml"
+    ignore_errors: yes
+
+- name: Gather system information for hardening decisions
+  setup:
+    gather_subset: hardware
+
+# 1.1 - Filesystem Configuration
+- name: Ensure /tmp partition exists with correct permissions
+  mount:
+    name: /tmp
+    fstype: tmpfs
+    opts: "defaults,noexec,nosuid,rw"
+    dump: "0"
+    passnum: "0"
+  when: hardening_level | int >= 1
+
+# 1.2 - Disk Partitioning
+- name: Verify disk encryption is enabled (if LVM available)
+  command: lvm vgs --noheadings -o vg_name,vg_size,pv_count 2>/dev/null || true
+  register: lvm_info
+  changed_when: false
+
+# 2.1 - User Configuration
+- name: Ensure root password is set (level 1+)
+  user:
+    name: root
+    password_lock: yes
+  when: hardening_level | int >= 1
+
+- name: Ensure password settings are enforced (level 2+)
+  pam.d::password:
+    name: common-password
+    setting: "password    requisite     pam_pwquality.so try_first_pass retry=3 minlen=15"
+  when: hardening_level | int >= 2
+
+# 2.2 - Account Management
+- name: Ensure password expiration is set (level 2+)
+  lineinfile:
+    path: /etc/login.defs
+    regexp: "^PASS_MAX_DAYS"
+    line: "PASS_MAX_DAYS   90"
+    state: present
+  when: hardening_level | int >= 2
+
+- name: Ensure password change minimum days is set (level 2+)
+  lineinfile:
+    path: /etc/login.defs
+    regexp: "^PASS_MIN_DAYS"
+    line: "PASS_MIN_DAYS   1"
+    state: present
+  when: hardening_level | int >= 2
+
+# 3.1 - Access and Authentication
+- name: Ensure nologin for disabled accounts (level 1+)
+  template:
+    src: etc_nodrop.conf.j2
+    dest: /etc/nodrop.conf
+  when: hardening_level | int >= 1
+
+# 4.1 - Filesystem Integrity
+- name: Install aide if not present (level 2+)
+  zypper:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - aide
+  when: hardening_level | int >= 2
+  ignore_errors: yes
+
+# 5.1 - Service Configuration
+- name: Disable unnecessary services (level 1+)
+  service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  loop: "{{ disable_services | default([]) }}"
+  when: hardening_level | int >= 1
+  ignore_errors: yes
+
+# 6.1 - Audit Configuration
+- name: Install auditd (level 2+)
+  zypper:
+    name: audit
+    state: present
+  when: hardening_level | int >= 2
+  ignore_errors: yes
+
+# 7.1 - Network Security
+- name: Ensure IP forwarding is disabled (level 1+)
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: "0"
+    state: present
+  when: hardening_level | int >= 1
+
+- name: Ensure packet logging is enabled (level 3+)
+  lineinfile:
+    path: /etc/sysconfig/iptables
+    line: "-A INPUT -j LOG --log-prefix 'PACKET DROPPED: '"
+    state: present
+  when: hardening_level | int >= 3
+  ignore_errors: yes

@@ -1,0 +1,6 @@
+# nodrop.conf - List of users who cannot login via getty
+# Lines starting with # are comments
+
+{% for user in disable_accounts | default([]) %}
+{{ user }}
+{% endfor %}

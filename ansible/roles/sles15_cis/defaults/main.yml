@@ -1,0 +1,15 @@
+---
+# Default variables for SLES 15 hardening role
+
+hardening_level: "1"
+
+disable_services:
+  - postfix
+  - cupsd
+
+# Enable audit rules
+audit_rules_enabled: true
+
+# Network security settings
+enable_ipsec: false
+enable_ssh_strong_crypto: true

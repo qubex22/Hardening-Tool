@@ -1,0 +1,15 @@
+---
+# SLES 15 Hardening Handlers
+
+- name: Restart auditd
+  service:
+    name: auditd
+    state: restarted
+
+- name: Reload sysctl
+  command: sysctl -p
+  args:
+    warn: no
+
+- name: Regenerate initramfs
+  command: dracut --force
