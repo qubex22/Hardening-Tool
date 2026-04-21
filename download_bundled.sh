@@ -42,9 +42,9 @@ fi
 
 # Debug: show what we have
 echo "Contents of downloads dir:"
-ls -laR "$TMPDIR_BUILD/galaxy/downloads/" 2>&1
+ls -laR "$TMPDIR_BUILD/galaxy/downloads/" 2>&1 || true
 echo "Contents of installed dir:"
-ls -laR "$TMPDIR_BUILD/galaxy/installed/" 2>&1
+ls -laR "$TMPDIR_BUILD/galaxy/installed/" 2>&1 || true
 
 # Package the collection from whichever source is available
 COLLECTION_SRC=""
