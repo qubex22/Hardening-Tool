@@ -163,8 +163,6 @@ func GetWhitelist() []string {
 // AddAuthorizedHash adds a hash to the whitelist at runtime
 // Note: This is for testing/diagnostics only. In production, use static whitelisting.
 func AddAuthorizedHash(hash string) {
-	if !strings.HasPrefix(hash, "sha256:") {
-		hash = "sha256:" + hash
-	}
+	hash = strings.TrimPrefix(hash, "sha256:")
 	authorizedFingerprints[hash] = true
 }
