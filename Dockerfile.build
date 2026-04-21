@@ -1,5 +1,35 @@
 # Build environment for harden-sles15
-# Uses bci-go — open SUSE Go Container Image (free, no SLES license required)
+# Uses golang:1.21-bookworm — open image, no SLES license required
 # Cross-compiles to Linux/amd64 statically linked binary
 
-FROM registry.suse.com/bci/bci-go:15.5 AS builder
+# Build the Go project
+FROM golang:1.21-bookworm AS builder
+
+WORKDIR /build
+
+# Copy go module files for dependency caching
+COPY go.mod .
+RUN go mod download
+
+# Copy full source code
+COPY . .
+
+# Make build script executable
+RUN chmod +x build.sh
+
+# Run the build
+RUN ./build.sh
+
+# Verify output
+RUN ls -lh harden-sles15.bin || (echo "Build failed" && exit 1)
+
+# Use a minimal scratch image for the final binary
+FROM scratch
+
+WORKDIR /tmp
+COPY --from=builder /build/harden-sles15.bin .
+COPY --from=builder /build/fingerprint-collector .
+COPY --from=builder /build/ansible ./ansible
+
+ENTRYPOINT ["/tmp/harden-sles15.bin"]
+CMD []

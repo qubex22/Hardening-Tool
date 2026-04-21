@@ -1,10 +1,8 @@
 # Build output
+harden-snes15.bin
 harden-sles15.bin
 fingerprint-collector
-*-collector
-
-# Python assets (generated at build time)
-python/assets/
+fingerprint-collector.exe
 
 # License keys (NEVER include in build)
 license/keys/*.pem
@@ -12,10 +10,10 @@ license/keys/*.key
 license/keys/*.pub*
 license/keys/dev.pem.example
 
-# Python cache
+# Python bytecode
 python/__pycache__/
-*.pyc
 __pycache__/
+*.pyc
 
 # Test artifacts
 tests/output/
@@ -36,12 +34,3 @@ tests/output/
 # OS
 .DS_Store
 Thumbs.db
-
-# Dockerfiles
-Dockerfile*
-.dockerignore
-docker-compose*
-
-# Misc (exclude from build context but keep in repo)
-.github/
-dev_plan*
