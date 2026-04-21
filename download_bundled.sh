@@ -32,12 +32,14 @@ GALAXY_OUTPUT=$(ansible-galaxy collection install ansible.posix --collections-pa
 }
 
 # Package the collection if galaxy downloaded it
+# ansible-galaxy expects tarballs with structure: ansible/<namespace>/<collection>/
 if [ -d "$TMPDIR_BUILD/galaxy/ansible_collections/ansible/posix" ]; then
-    mkdir -p "$TMPDIR_BUILD/galaxy/tarball"
-    cp -r "$TMPDIR_BUILD/galaxy/ansible_collections" "$TMPDIR_BUILD/galaxy/tarball/"
+    # Create proper collection tarball structure
+    mkdir -p "$TMPDIR_BUILD/collection_pkg/ansible/posix"
+    cp -r "$TMPDIR_BUILD/galaxy/ansible_collections/ansible/posix/"* "$TMPDIR_BUILD/collection_pkg/ansible/posix/"
     (
-        cd "$TMPDIR_BUILD/galaxy/tarball"
-        tar -czf "$TMPDIR_BUILD/ansible-posix.tar.gz" ansible_collections/
+        cd "$TMPDIR_BUILD/collection_pkg"
+        tar -czf "$TMPDIR_BUILD/ansible-posix.tar.gz" ansible/
     )
     cp "$TMPDIR_BUILD/ansible-posix.tar.gz" "$BUNDLE_DIR/"
     echo "ansible.posix collection bundled."
