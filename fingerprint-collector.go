@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"os"
 
-	"harden-sles15/fingerprint"
+	"harden_sles15/fingerprint"
 )
 
 func main() {

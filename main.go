@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"harden-sles15/ansible_runner"
-	"harden-sles15/fingerprint"
-	"harden-sles15/license"
-	"harden-sles15/python"
+	"harden_sles15/ansible_runner"
+	"harden_sles15/fingerprint"
+	"harden_sles15/license"
+	"harden_sles15/python"
 )
 
 //go:embed ansible/playbook.yml

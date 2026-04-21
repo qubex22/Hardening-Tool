@@ -98,13 +98,13 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Test fingerprint package
-        run: go test -v harden-sles15/fingerprint -run TestCollectAndHash
+        run: go test -v harden_sles15/fingerprint -run TestCollectAndHash
 
       - name: Test fingerprint determinism
-        run: go test -v harden-sles15/fingerprint -run TestDeterministicHash
+        run: go test -v harden_sles15/fingerprint -run TestDeterministicHash
 
       - name: Test fingerprint normalized output
-        run: go test -v harden-sles15/fingerprint -run TestNormalizedOutput
+        run: go test -v harden_sles15/fingerprint -run TestNormalizedOutput
 
   # Integration test - verify license/runner
   integration-test:
@@ -130,12 +130,12 @@ jobs:
         run: go mod download
 
       - name: Test license package
-        run: go test -v harden-sles15/license
+        run: go test -v harden_sles15/license
 
       - name: Test ansible_runner
         run: |
           go mod tidy
-          go test -v harden-sles15/ansible_runner
+          go test -v harden_sles15/ansible_runner
 
       - name: Test main package structure
-        run: go test -v harden-sles15
+        run: go test -v harden_sles15

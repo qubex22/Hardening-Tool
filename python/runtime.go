@@ -18,7 +18,7 @@ type PythonRuntime struct {
 
 // New initializes the embedded Python runtime
 func New() (*PythonRuntime, error) {
-	ep, err := python.NewEmbeddedPython("harden-sles15")
+	ep, err := python.NewEmbeddedPython("harden_sles15")
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize embedded Python: %w", err)
 	}

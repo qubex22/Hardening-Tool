@@ -1,4 +1,4 @@
-module harden-sles15/python
+module harden_sles15/python
 
 go 1.21
 

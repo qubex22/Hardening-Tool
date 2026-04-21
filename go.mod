@@ -1,4 +1,4 @@
-module harden-sles15
+module harden_sles15
 
 go 1.21
 
