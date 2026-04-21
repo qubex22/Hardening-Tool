@@ -3,10 +3,13 @@
 # Placeholder - replace with actual hardening playbooks
 
 - name: Apply SLES 15 Security Hardening
-  hosts: all
+  hosts: localhost
+  connection: local
   become: yes
-  max_fail_pct: 25
-  serial: 1
+  gather_facts: no
+
+  vars:
+    max_fail_pct: 25
 
   tasks:
     - name: Display system information
