@@ -241,6 +241,6 @@ func NewDefaultExecutor() ansibleExecute.Executor {
 }
 
 // NewJSONResultCallback returns a stdout callback function that parses JSON results
-func NewJSONResultCallback() results.StdoutCallbackResultsFunc {
+func NewJSONResultCallback() func(context.Context, io.Reader, io.Writer, ...results.TransformerFunc) error {
 	return results.JSONStdoutCallbackResults
 }
