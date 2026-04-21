@@ -52,7 +52,7 @@ COLLECTION_SRC=""
 
 # Check for pre-built tarball from ansible-galaxy download
 if ls "$TMPDIR_BUILD/galaxy/downloads/ansible-posix-"*.tar.gz 1>/dev/null 2>&1; then
-    cp "$TMPDIR_BUILD/galaxy/downloads/ansible-posix-"*.tar.gz "$BUNDLE_DIR/"
+    cp "$TMPDIR_BUILD/galaxy/downloads/ansible-posix-"*.tar.gz "$BUNDLE_DIR/ansible-posix.tar.gz"
     echo "Pre-built ansible.posix tarball bundled."
     COLLECTION_SRC="prebuilt"
 fi
