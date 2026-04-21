@@ -121,11 +121,21 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Download dependencies
+        run: go mod download
+
       - name: Test license package
         run: go test -v harden-sles15/license
 
       - name: Test ansible_runner
-        run: go test -v harden-sles15/ansible_runner
+        run: |
+          go mod tidy
+          go test -v harden-sles15/ansible_runner
 
       - name: Test main package structure
         run: go test -v harden-sles15
