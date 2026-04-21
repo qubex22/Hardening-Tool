@@ -12,55 +12,51 @@ export CGO_ENABLED=0
 
 # Step 1: Ensure go.sum is up to date
 echo ""
-echo "[1/5] Validating dependencies..."
+echo "[1/4] Validating dependencies..."
 go mod tidy
 go mod download
 
-# Step 2: Generate bundled pip packages (needs internet)
+# Step 2: Download and bundle ansible-core wheels and collections (needs internet)
 echo ""
-echo "[2/5] Generating bundled Python packages..."
-cd python/pip_gen
-go mod tidy
-go run main.go
-cd ../..
-echo "Bundled packages generated."
+echo "[2/4] Downloading and bundling Python packages..."
+mkdir -p python/bundled
 
-# Step 3: Download and bundle ansible collections (needs internet)
-echo ""
-echo "[3/5] Downloading ansible collections..."
-TMP_GALAXY=$(mktemp -d)
+# Create a temp venv to install ansible and download packages
+TMPDIR_BUILD=$(mktemp -d)
+python3 -m venv "$TMPDIR_BUILD/venv"
+source "$TMPDIR_BUILD/venv/bin/activate"
 
-# Download ansible.posix collection using ansible-galaxy
-python3 -m ansible.galaxy install ansible.posix --collections-path "$TMP_GALAXY" 2>/dev/null || {
-    # Fallback: download tarball directly from GitHub
-    echo "ansible-galaxy not available, downloading from GitHub..."
-    COLLECTION_VERSION="1.5.6"
-    curl -sL "https://github.com/ansible-collections/ansible.posix/archive/refs/tags/${COLLECTION_VERSION}.tar.gz" \
-        -o "python/bundled/ansible-posix-${COLLECTION_VERSION}.tar.gz"
-    rm -rf "$TMP_GALAXY"
-    exit 0
-}
+# Install ansible-core to get all its dependencies as wheels
+pip install --wheel-dir "$TMPDIR_BUILD/wheels" --no-cache-dir ansible-core
 
-# If galaxy installed it as a directory, package it as a tarball
-if [ -d "$TMP_GALAXY/ansible_collections/ansible/posix" ]; then
-    mkdir -p "$TMP_GALAXY/tarball"
-    cp -r "$TMP_GALAXY/ansible_collections" "$TMP_GALAXY/tarball/"
-    cd "$TMP_GALAXY/tarball"
-    tar -czf "$PWD/../../python/bundled/ansible-posix.tar.gz" ansible_collections/
+# Download ansible.posix collection
+ansible-galaxy collection install ansible.posix --roles-path "$TMPDIR_BUILD/galaxy" 2>/dev/null || true
+
+# Package the collection if galaxy downloaded it as a directory
+if [ -d "$TMPDIR_BUILD/galaxy/ansible_collections/ansible/posix" ]; then
+    mkdir -p "$TMPDIR_BUILD/galaxy/tarball"
+    cp -r "$TMPDIR_BUILD/galaxy/ansible_collections" "$TMPDIR_BUILD/galaxy/tarball/"
+    cd "$TMPDIR_BUILD/galaxy/tarball"
+    tar -czf "$TMPDIR_BUILD/ansible-posix.tar.gz" ansible_collections/
     cd -
+    cp "$TMPDIR_BUILD/ansible-posix.tar.gz" python/bundled/
 fi
 
-rm -rf "$TMP_GALAXY"
-echo "Collections downloaded and bundled."
+# Copy all wheels to bundled directory
+cp "$TMPDIR_BUILD/wheels"/* python/bundled/ 2>/dev/null || true
 
-# Step 4: Compile main binary
+deactivate
+rm -rf "$TMPDIR_BUILD"
+echo "Packages bundled."
+
+# Step 3: Compile main binary
 echo ""
-echo "[4/5] Compiling harden-sles15.bin..."
+echo "[3/4] Compiling harden-sles15.bin..."
 go build -ldflags="-s -w" -o harden-sles15.bin .
 
-# Step 5: Compile fingerprint-collector standalone
+# Step 4: Compile fingerprint-collector standalone
 echo ""
-echo "[5/5] Compiling fingerprint-collector..."
+echo "[4/4] Compiling fingerprint-collector..."
 go build -tags fingerprint -o fingerprint-collector ./fingerprint-collector.go
 
 # Verify build output
@@ -69,9 +65,9 @@ echo "Verifying build output..."
 if [ -f "harden-sles15.bin" ]; then
     if strings harden-sles15.bin 2>/dev/null | grep -q "ansible-playbook" || \
        strings harden-sles15.bin 2>/dev/null | grep -q "ansible_core"; then
-        echo "  ✓ Binary contains embedded ansible assets"
+        echo "  OK Binary contains embedded ansible assets"
     else
-        echo "  ⚠ Warning: ansible assets may not be embedded."
+        echo "  WARNING: ansible assets may not be embedded."
     fi
     BUNDLE_SIZE=$(du -sh python/bundled 2>/dev/null | cut -f1 || echo "N/A")
     echo "  Bundled packages size: ${BUNDLE_SIZE}"
