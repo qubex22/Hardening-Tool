@@ -199,9 +199,20 @@ func ensureAnsiblePosixCollection(pythonExe, pythonDir string) error {
 		return fmt.Errorf("failed to create collections dir: %w", err)
 	}
 
-	// Install the collection using ansible-galaxy
+	// Install the collection using ansible-galaxy (standalone script, not a python module)
 	fmt.Println("Installing ansible.posix collection from bundled assets...")
-	galaxyCmd := exec.Command(pythonExe, "-m", "ansible-galaxy", "collection", "install",
+	galaxyScript := filepath.Join(pythonDir, "bin", "ansible-galaxy")
+	if runtime.GOOS == "windows" {
+		galaxyScript = filepath.Join(pythonDir, "Scripts", "ansible-galaxy.exe")
+	}
+	if _, err := os.Stat(galaxyScript); err != nil {
+		// Fallback: try finding ansible-galaxy on PATH
+		galaxyScript, _ = exec.LookPath("ansible-galaxy")
+		if galaxyScript == "" {
+			return fmt.Errorf("ansible-galaxy not found at %s or on PATH", filepath.Join(pythonDir, "bin", "ansible-galaxy"))
+		}
+	}
+	galaxyCmd := exec.Command(galaxyScript, "collection", "install",
 		tarballPath, "--collections-path", collectionDir, "--force")
 	fmt.Printf("DEBUG: galaxy cmd: %s %s\n", galaxyCmd.Path, strings.Join(galaxyCmd.Args, " "))
 	if output, err := galaxyCmd.CombinedOutput(); err != nil {
