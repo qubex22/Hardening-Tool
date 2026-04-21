@@ -25,8 +25,13 @@ func InstallBundledAnsible(pythonDir string) error {
 	defer os.RemoveAll(tmpDir)
 
 	// Extract bundled files to temp dir (skip .placeholder files)
-	// go:embed bundled embeds the *contents* of the bundled/ directory
-	if err := fs.WalkDir(bundledFS, ".", func(path string, d fs.DirEntry, err error) error {
+	// go:embed bundled embeds with "bundled/" prefix, e.g. "bundled/ansible_core.whl"
+	rootPath := "bundled"
+	if _, err := bundledFS.Stat(rootPath); err != nil {
+		// Fallback: try root "." in case embed changed
+		rootPath = "."
+	}
+	if err := fs.WalkDir(bundledFS, rootPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -135,9 +140,15 @@ func installBundledCollections(pythonExe, tmpDir, collectionDir string) error {
 
 // ensureAnsiblePosixCollection extracts and installs the bundled ansible.posix collection
 func ensureAnsiblePosixCollection(pythonExe, pythonDir string) error {
+	// Determine the root path in the embedded FS
+	rootPath := "bundled"
+	if _, err := bundledFS.Stat(rootPath); err != nil {
+		rootPath = "."
+	}
+
 	// List all embedded files for debugging
 	allFiles := []string{}
-	fs.WalkDir(bundledFS, ".", func(path string, d fs.DirEntry, err error) error {
+	fs.WalkDir(bundledFS, rootPath, func(path string, d fs.DirEntry, err error) error {
 		if err == nil && !d.IsDir() {
 			allFiles = append(allFiles, path)
 		}
@@ -147,7 +158,7 @@ func ensureAnsiblePosixCollection(pythonExe, pythonDir string) error {
 
 	// Find the ansible.posix tarball in the embedded bundled files
 	var collectionTarballPath string
-	err := fs.WalkDir(bundledFS, ".", func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(bundledFS, rootPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -158,9 +169,9 @@ func ensureAnsiblePosixCollection(pythonExe, pythonDir string) error {
 		return nil
 	})
 	if collectionTarballPath == "" {
-		fmt.Printf("WARNING: No ansible-posix.tar.gz found in embedded bundles. Available files: %v\n", allFiles)
+		fmt.Printf("WARNING: No ansible-posix.tar.gz found in embedded bundles.\n")
 		// Try to find any tar.gz file
-		fs.WalkDir(bundledFS, ".", func(path string, d fs.DirEntry, err error) error {
+		fs.WalkDir(bundledFS, rootPath, func(path string, d fs.DirEntry, err error) error {
 			if err == nil && !d.IsDir() && strings.HasSuffix(path, ".tar.gz") {
 				fmt.Printf("  Found tarball: %s\n", path)
 			}

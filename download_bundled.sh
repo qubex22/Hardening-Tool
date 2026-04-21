@@ -15,10 +15,16 @@ python3 -m venv "$TMPDIR_BUILD/venv"
 . "$TMPDIR_BUILD/venv/bin/activate"
 
 # Download ansible-core and all dependencies as wheels
+echo "Downloading ansible-core wheels..."
 pip wheel --wheel-dir "$TMPDIR_BUILD/wheels" --no-cache-dir ansible-core
 
-# Download ansible.posix collection
-ansible-galaxy collection install ansible.posix --roles-path "$TMPDIR_BUILD/galaxy" 2>/dev/null || true
+# Download ansible.posix collection using the same venv's ansible-galaxy
+echo "Downloading ansible.posix collection..."
+GALAXY_OUTPUT=$(ansible-galaxy collection install ansible.posix --roles-path "$TMPDIR_BUILD/galaxy" 2>&1) || {
+    echo "ansible-galaxy output: $GALAXY_OUTPUT"
+    echo "ERROR: Failed to download ansible.posix collection"
+    exit 1
+}
 
 # Package the collection if galaxy downloaded it
 if [ -d "$TMPDIR_BUILD/galaxy/ansible_collections/ansible/posix" ]; then
@@ -31,7 +37,9 @@ if [ -d "$TMPDIR_BUILD/galaxy/ansible_collections/ansible/posix" ]; then
     cp "$TMPDIR_BUILD/ansible-posix.tar.gz" "$BUNDLE_DIR/"
     echo "ansible.posix collection bundled."
 else
-    echo "WARNING: ansible.posix collection download failed."
+    echo "ERROR: ansible.posix collection not found at $TMPDIR_BUILD/galaxy/ansible_collections/ansible/posix"
+    ls -la "$TMPDIR_BUILD/galaxy/" 2>/dev/null || echo "(galaxy dir does not exist)"
+    exit 1
 fi
 
 # Copy all wheels to bundled directory
