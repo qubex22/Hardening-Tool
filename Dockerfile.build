@@ -5,6 +5,8 @@
 # Build the Go project
 FROM golang:1.21-bookworm AS builder
 
+RUN apt-get update && apt-get install -y python3-venv python3 python3-pip && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /build
 
 # Copy go module files for dependency caching
