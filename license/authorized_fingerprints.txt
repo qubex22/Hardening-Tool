@@ -1,0 +1,4 @@
+# Authorized device fingerprints
+# One SHA256 hash per line (64 hex characters)
+# Prefix with "sha256:" is supported but not required
+# If this file is empty (no fingerprints), all devices are allowed
