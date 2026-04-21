@@ -135,6 +135,16 @@ func installBundledCollections(pythonExe, tmpDir, collectionDir string) error {
 
 // ensureAnsiblePosixCollection extracts and installs the bundled ansible.posix collection
 func ensureAnsiblePosixCollection(pythonExe, pythonDir string) error {
+	// List all embedded files for debugging
+	allFiles := []string{}
+	fs.WalkDir(bundledFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			allFiles = append(allFiles, path)
+		}
+		return nil
+	})
+	fmt.Printf("DEBUG: embedded bundled files: %v\n", allFiles)
+
 	// Find the ansible.posix tarball in the embedded bundled files
 	var collectionTarballPath string
 	err := fs.WalkDir(bundledFS, ".", func(path string, d fs.DirEntry, err error) error {
@@ -147,10 +157,15 @@ func ensureAnsiblePosixCollection(pythonExe, pythonDir string) error {
 		}
 		return nil
 	})
-
-	// If no tarball found, collection may not be bundled — skip silently
 	if collectionTarballPath == "" {
-		fmt.Println("No bundled ansible.posix collection found, skipping.")
+		fmt.Printf("WARNING: No ansible-posix.tar.gz found in embedded bundles. Available files: %v\n", allFiles)
+		// Try to find any tar.gz file
+		fs.WalkDir(bundledFS, ".", func(path string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() && strings.HasSuffix(path, ".tar.gz") {
+				fmt.Printf("  Found tarball: %s\n", path)
+			}
+			return nil
+		})
 		return nil
 	}
 
@@ -175,6 +190,7 @@ func ensureAnsiblePosixCollection(pythonExe, pythonDir string) error {
 
 	// Ensure the collections directory exists
 	collectionDir := getAnsibleCollectionsDir(pythonDir)
+	fmt.Printf("DEBUG: Installing collection to: %s\n", collectionDir)
 	if err := os.MkdirAll(collectionDir, 0755); err != nil {
 		return fmt.Errorf("failed to create collections dir: %w", err)
 	}
@@ -183,7 +199,9 @@ func ensureAnsiblePosixCollection(pythonExe, pythonDir string) error {
 	fmt.Println("Installing ansible.posix collection from bundled assets...")
 	galaxyCmd := exec.Command(pythonExe, "-m", "ansible-galaxy", "collection", "install",
 		tarballPath, "--collections-path", collectionDir, "--force")
+	fmt.Printf("DEBUG: galaxy cmd: %s %s\n", galaxyCmd.Path, strings.Join(galaxyCmd.Args, " "))
 	if output, err := galaxyCmd.CombinedOutput(); err != nil {
+		fmt.Printf("DEBUG: galaxy output: %s\n", string(output))
 		// Check if it's already installed (idempotent)
 		if strings.Contains(string(output), "already installed") || strings.Contains(string(output), "was installed successfully") {
 			fmt.Println("ansible.posix collection already installed.")
@@ -192,7 +210,19 @@ func ensureAnsiblePosixCollection(pythonExe, pythonDir string) error {
 		return fmt.Errorf("ansible-galaxy collection install failed: %w: %s", err, string(output))
 	}
 
-	fmt.Println("ansible.posix collection installed successfully.")
+	// Verify the collection was installed
+	expectedDir := filepath.Join(collectionDir, "ansible", "posix")
+	if _, err := os.Stat(expectedDir); err == nil {
+		fmt.Println("ansible.posix collection installed successfully.")
+	} else {
+		fmt.Printf("WARNING: Collection dir %s not found after install. Contents: ", expectedDir)
+		// List collection dir contents
+		entries, _ := os.ReadDir(collectionDir)
+		for _, e := range entries {
+			fmt.Printf("%s ", e.Name())
+		}
+		fmt.Println()
+	}
 	return nil
 }
 
