@@ -1,14 +1,19 @@
 # Build output
 harden-sles15.bin
+fingerprint-collector
+
+# Python assets (generated at build time, too large to commit)
 python/assets/
 
 # License keys (NEVER commit)
 license/keys/*.pem
 license/keys/*.key
+license/keys/*.pub*
 
-# Python virtual environment
+# Python bytecode
 python/__pycache__/
-python/*.pyc
+__pycache__/
+*.pyc
 
 # Test artifacts
 tests/*.log
@@ -20,5 +25,6 @@ tests/output/
 *.swp
 *.swo
 
-# OS X
+# OS
 .DS_Store
+Thumbs.db

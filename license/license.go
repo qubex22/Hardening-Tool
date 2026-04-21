@@ -4,18 +4,18 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"strings"
 )
 
-// authorizedFingerprints is a whitelist of authorized device hashes.
-// In production, this should be loaded from an encrypted store.
-// For development, you can use the dev.pem key in keys/ to sign fingerprints.
+// authorizedFingerprints is a whitelist of authorized device fingerprint hashes.
+// The hash is the raw SHA256 hex string (64 hex chars) as produced by fingerprint.Collect().
+// In production, this should be loaded from an encrypted configuration or external source.
 var authorizedFingerprints = map[string]bool{
-	// sha256:<hash> format
-	// Add authorized hashes here after computing them with fingerprint-collector.bin
+	// Add raw SHA256 hex hashes here (e.g., "a1b2c3d4...") after computing with fingerprint-collector
 }
 
 // EncryptedAssets holds information about encrypted playbook data
@@ -32,12 +32,14 @@ func IsAuthorized(fingerprintHash string) bool {
 
 // VerifyFingerprint validates a fingerprint against the whitelist and returns appropriate error info
 func VerifyFingerprint(fingerprintHash string) (bool, string) {
-	if !IsAuthorized(fingerprintHash) {
+	// Normalize: strip "sha256:" prefix if present
+	hash := strings.TrimPrefix(fingerprintHash, "sha256:")
+	if !IsAuthorized(hash) {
 		return false, fmt.Sprintf(
 			"Error: Unauthorized device.\n"+
-				"Fingerprint hash: %s\n"+ // The user can share this with support
+				"Fingerprint hash: %s\n"+
 				"Please contact support@yourorg.com to request authorization.",
-			fingerprintHash,
+			hash,
 		)
 	}
 	return true, ""
@@ -108,11 +110,10 @@ func EncryptAESGCM(plaintext []byte, fingerprint string, masterSecret []byte) (s
 		return "", fmt.Errorf("failed to create GCM: %w", err)
 	}
 
-	// Generate nonce
+	// Generate cryptographically secure nonce
 	nonce := make([]byte, 12)
-	// In production, use crypto/rand.Read for cryptographically secure randomness
-	for i := range nonce {
-		nonce[i] = byte(i) // Placeholder - replace with proper random generation
+	if _, err := rand.Read(nonce); err != nil {
+		return "", fmt.Errorf("failed to generate nonce: %w", err)
 	}
 
 	ciphertext := aesgcm.Seal(nil, nonce, plaintext, nil)

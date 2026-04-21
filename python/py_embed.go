@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/kluctl/go-embed-python/v2/embed"
+	"github.com/kluctl/go-embed-python/embed"
 )
 
 func main() {

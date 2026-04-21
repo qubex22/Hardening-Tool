@@ -103,8 +103,7 @@ func (r *AnsibleRunner) Run() (*execution.PlaybookExecutionResult, error) {
 		return nil, fmt.Errorf("failed to create playbook: %w", err)
 	}
 
-	// Set verbosity
-	var verbose bool
+	// Set verbosity (1=v, 2=vv, 3=vvv, 4=vvvv=verbose+trace)
 	switch r.verbosity {
 	case 1:
 		pb.SetVerbose(true)
@@ -113,7 +112,8 @@ func (r *AnsibleRunner) Run() (*execution.PlaybookExecutionResult, error) {
 	case 3:
 		pb.SetTrace(true)
 	case 4:
-		pb.SetCheck(true)
+		pb.SetVerbose(true)
+		pb.SetTrace(true)
 	}
 
 	// Create execution context

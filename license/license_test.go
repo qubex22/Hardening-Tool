@@ -6,15 +6,14 @@ import (
 
 func TestIsAuthorized(t *testing.T) {
 	// Test with empty whitelist (should all be unauthorized)
-	hash := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-	authorized := IsAuthorized(hash)
+	authorized := IsAuthorized("0000000000000000000000000000000000000000000000000000000000000000")
 	if authorized {
 		t.Error("Empty whitelist should not authorize any hash")
 	}
 }
 
 func TestVerifyFingerprintUnauthorized(t *testing.T) {
-	hash := "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	valid, msg := VerifyFingerprint(hash)
 
 	if valid {
@@ -27,10 +26,10 @@ func TestVerifyFingerprintUnauthorized(t *testing.T) {
 }
 
 func TestAddAuthorizedHash(t *testing.T) {
-	testHash := "test-hash-123"
+	testHash := "testhash123abcdef"
 	AddAuthorizedHash(testHash)
 
-	if !IsAuthorized(testHash) && !IsAuthorized("sha256:"+testHash) {
+	if !IsAuthorized(testHash) {
 		t.Error("Hash should have been added to whitelist")
 	}
 }

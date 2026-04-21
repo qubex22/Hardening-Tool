@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/yourorg/harden-sles15/fingerprint"
+	"harden-sles15/fingerprint"
 )
 
 func main() {

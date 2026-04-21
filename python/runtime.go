@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/kluctl/go-embed-python/v2/embed"
+	"github.com/kluctl/go-embed-python/embed"
 )
 
 // PythonRuntime manages the embedded Python environment
@@ -80,21 +80,29 @@ sys.path.insert(0, python_path)
 
 try:
     import ansible
-    print(f"Ansible version: {ansible.__version__}")
+    print("Ansible version: " + ansible.__version__)
 except ImportError as e:
-    print(f"Failed to import Ansible: {{e}}", file=sys.stderr)
+    print("Failed to import Ansible: " + str(e), file=sys.stderr)
     sys.exit(1)
 
 # Run the playbook
-from ansible.runner import Runner
-runner = Runner(playbook='{{playbookPath}}', connection='{{connection}}')
-result = runner.run()
-if result == 0:
-    print("Playbook completed successfully")
-else:
-    print(f"Playbook failed with exit code {{result}}")
+from ansible import context
+from ansible.cli.adhoc import AdHocCLI
+from ansible.parsing.dataloader import DataLoader
+from ansible.vars.manager import VariableManager
+from ansible.playbook import Playbook
+
+loader = DataLoader()
+try:
+    pb = Playbook.load(%q, variable_manager=None, loader=loader)
+    print("Playbook loaded successfully: %s")
+except Exception as e:
+    print("Failed to load playbook: " + str(e), file=sys.stderr)
     sys.exit(1)
-`, r.pythonDir, playbookPath, connection)
+
+# Execute playbook via ansible-playbook command
+os.execv('ansible-playbook', ['ansible-playbook', '-c', %q, %q])
+`, r.pythonDir, playbookPath, playbookPath, connection, playbookPath)
 
 	return r.RunScript(script, []string{})
 }

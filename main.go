@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/yourorg/harden-sles15/ansible_runner"
-	"github.com/yourorg/harden-sles15/fingerprint"
-	"github.com/yourorg/harden-sles15/license"
+	"harden-sles15/ansible_runner"
+	"harden-sles15/fingerprint"
+	"harden-sles15/license"
 )
 
 //go:embed ansible/playbook.yml

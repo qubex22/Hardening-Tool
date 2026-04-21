@@ -1,34 +1,5 @@
 # Build environment for harden-sles15
-# Based on SLES 15 with Go installed
+# Uses bci-go — open SUSE Go Container Image (free, no SLES license required)
+# Cross-compiles to Linux/amd64 statically linked binary
 
-FROM registry.suse.com/suse/ltss/sle15.6/bci-base:latest
-
-# Install Go and build dependencies
-RUN zypper -n install -y \
-    gcc \
-    make \
-    openssl \
-    sha256sum \
-    && zypper clean --all
-
-# Set up Go (download from upstream)
-ENV GOLANG_VERSION=1.21.0
-RUN curl -SL https://go.dev/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz -o /tmp/golang.tar.gz \
-    && tar -C /usr/local -xzf /tmp/golang.tar.gz \
-    && rm /tmp/golang.tar.gz
-
-ENV PATH=/usr/local/go/bin:$PATH
-RUN go version
-
-WORKDIR /build
-
-# Copy source for caching
-COPY go.mod ./
-RUN go mod download
-
-COPY . .
-
-# Build script entrypoint
-RUN chmod +x build.sh
-
-CMD ["./build.sh"]
+FROM registry.suse.com/bci/bci-go:15.5 AS builder

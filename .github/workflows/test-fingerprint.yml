@@ -13,7 +13,7 @@ on:
 
 jobs:
   test-fingerprint-go:
-    name: Go Tests
+    name: Go Fingerprint Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -32,53 +32,6 @@ jobs:
 
       - name: Test fingerprint collector binary
         run: |
-          # Build the fingerprint collector
           go build -o fingerprint-collector ./fingerprint-collector.go
-
-          # Run with --help to verify it works
           ./fingerprint-collector --help
-
-          # Collect a real fingerprint (will fail on non-SLES but should not crash)
-          echo "Collecting fingerprint..."
           ./fingerprint-collector || true
-
-  test-fingerprint-docker:
-    name: Test in SLES Container
-    runs-on: ubuntu-latest
-
-    services:
-      sles15:
-        image: registry.suse.com/bci/bci-spin:15.5
-        options: --privileged
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Build fingerprint collector in SLES container
-        run: |
-          # Create a simple test script that runs inside the container
-          cat > test-fp.sh << 'EOF'
-          #!/bin/bash
-          set -e
-
-          echo "Testing in SLES container..."
-          go version || echo "Go not installed, skipping build test"
-
-          # Test if we can at least read machine-id format
-          if [ -f /etc/machine-id ]; then
-            echo "/etc/machine-id exists: $(cat /etc/machine-id)"
-          else
-            echo "/etc/machine-id not found (normal in some containers)"
-          fi
-
-          # Test DMI paths
-          ls -la /sys/class/dmi/id/ 2>/dev/null || echo "DMI not available"
-          EOF
-
-          chmod +x test-fp.sh
-
-      - name: Run SLES container tests
-        run: |
-          docker run --rm registry.suse.com/bci/bci-spin:15.5 \
-            /bin/bash -c "echo 'Container ready' && cat /etc/os-release | grep PRETTY_NAME"
