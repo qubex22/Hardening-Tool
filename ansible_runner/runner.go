@@ -288,12 +288,6 @@ func setupAnsibleEnv(cmd *exec.Cmd, pythonDir string) {
 // setupEnv configures environment variables for the embedded Python/Ansible
 func (r *AnsibleRunner) setupEnv(cmd *exec.Cmd) {
 	setupAnsibleEnv(cmd, r.pythonDir)
-
-	// Add ANSIBLE_COLLECTIONS_PATH so ansible finds bundled collections
-	collectionsPath := filepath.Join(r.pythonDir, "lib", "ansible_collections")
-	if _, err := os.Stat(collectionsPath); err == nil {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("ANSIBLE_COLLECTIONS_PATH=%s", collectionsPath))
-	}
 }
 
 // parsePlaybookOutput parses ansible-playbook output to extract results
