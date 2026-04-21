@@ -4,27 +4,26 @@ package python
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
-	"github.com/kluctl/go-embed-python/embed"
+	"github.com/kluctl/go-embed-python/python"
 )
 
 // PythonRuntime manages the embedded Python environment
 type PythonRuntime struct {
-	py        *embed.EmbeddedPython
-	pythonDir string
+	ep *python.EmbeddedPython
 }
 
 // New initializes the embedded Python runtime
 func New() (*PythonRuntime, error) {
-	e, err := embed.New(embed.WithPythonVersion("3.11"))
+	ep, err := python.NewEmbeddedPython("harden-sles15")
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize embedded Python: %w", err)
 	}
 
 	return &PythonRuntime{
-		py:        e,
-		pythonDir: e.PythonDir(),
+		ep: ep,
 	}, nil
 }
 
@@ -43,11 +42,14 @@ func (r *PythonRuntime) RunScript(script string, args []string) error {
 	}
 
 	// Build Python command with embedded path
-	pythonPath := filepath.Join(r.pythonDir, "bin", "python3")
 	cmdArgs := append([]string{tmpFile.Name()}, args...)
 
-	// Add the script directory to PYTHONPATH
-	if err := r.py.RunCommand(cmdArgs...); err != nil {
+	cmd := r.ep.PythonCmd(cmdArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err = cmd.Run()
+	if err != nil {
 		return fmt.Errorf("failed to run script: %w", err)
 	}
 
@@ -56,12 +58,12 @@ func (r *PythonRuntime) RunScript(script string, args []string) error {
 
 // GetPythonDir returns the path to the embedded Python installation
 func (r *PythonRuntime) GetPythonDir() string {
-	return r.pythonDir
+	return r.ep.GetExtractedPath()
 }
 
 // Verify checks if Python is properly initialized
 func (r *PythonRuntime) Verify() error {
-	pythonBin := filepath.Join(r.pythonDir, "bin", "python3")
+	pythonBin := r.ep.GetExePath()
 	if _, err := os.Stat(pythonBin); err != nil {
 		return fmt.Errorf("embedded Python binary not found at %s: %w", pythonBin, err)
 	}
@@ -86,23 +88,21 @@ except ImportError as e:
     sys.exit(1)
 
 # Run the playbook
-from ansible import context
-from ansible.cli.adhoc import AdHocCLI
-from ansible.parsing.dataloader import DataLoader
-from ansible.vars.manager import VariableManager
-from ansible.playbook import Playbook
-
-loader = DataLoader()
-try:
-    pb = Playbook.load(%q, variable_manager=None, loader=loader)
-    print("Playbook loaded successfully: %s")
-except Exception as e:
-    print("Failed to load playbook: " + str(e), file=sys.stderr)
-    sys.exit(1)
-
-# Execute playbook via ansible-playbook command
-os.execv('ansible-playbook', ['ansible-playbook', '-c', %q, %q])
-`, r.pythonDir, playbookPath, playbookPath, connection, playbookPath)
+import subprocess
+result = subprocess.run(
+    ["ansible-playbook", "-c", %q, %q],
+    stdout=sys.stdout,
+    stderr=sys.stderr
+)
+sys.exit(result.returncode)
+`, r.GetPythonDir(), connection, playbookPath)
 
 	return r.RunScript(script, []string{})
+}
+
+// Cleanup releases embedded Python resources
+func (r *PythonRuntime) Cleanup() {
+	if r.ep != nil {
+		r.ep.Cleanup()
+	}
 }

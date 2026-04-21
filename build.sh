@@ -8,8 +8,7 @@ echo "========================================"
 # Cross-compile target
 export GOOS=linux
 export GOARCH=amd64
-# CGO_ENABLED=1 is required for go-embed-python to link properly
-export CGO_ENABLED=1
+export CGO_ENABLED=0
 
 # Step 1: Ensure go.sum is up to date
 echo ""
@@ -17,15 +16,11 @@ echo "[1/4] Validating dependencies..."
 go mod tidy
 go mod download
 
-# Step 2: Build embedded Python assets
+# Step 2: Build embedded Python assets (no-op, Python is embedded at compile time)
 echo ""
 echo "[2/4] Building embedded Python assets..."
-if [ ! -d "./python/assets" ] || [ -z "$(ls -A ./python/assets 2>/dev/null)" ]; then
-    go run ./python/py_embed.go --dump-assets ./python/assets
-    echo "Python assets extracted to ./python/assets/"
-else
-    echo "Python assets already exist, skipping..."
-fi
+go run ./python/py_embed.go --dump-assets ./python/assets
+echo "Python assets embedded at compile time (go-embed-python)."
 
 # Step 3: Compile main binary
 echo ""
