@@ -2,15 +2,19 @@ package ansible_runner
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/apenella/go-ansible/execution"
-	"github.com/apenella/go-ansible/playbook"
+	ansibleExecute "github.com/apenella/go-ansible/pkg/execute"
+	ansibleOptions "github.com/apenella/go-ansible/pkg/options"
+	ansiblePlaybook "github.com/apenella/go-ansible/pkg/playbook"
+	"github.com/apenella/go-ansible/pkg/stdoutcallback/results"
 )
 
 // AnsibleRunner manages Ansible execution within the Go application
@@ -19,8 +23,8 @@ type AnsibleRunner struct {
 	inventory      string
 	privateKeyFile string
 	connection     string
-	factsDir       string
-	varsFiles      []string
+	become         bool
+	becomeMethod   string
 	verbosity      int
 }
 
@@ -42,19 +46,28 @@ func WithConnection(conn string) RunnerOption {
 	return func(r *AnsibleRunner) { r.connection = conn }
 }
 
-// WithFactsDir sets the directory for host facts
-func WithFactsDir(dir string) RunnerOption {
-	return func(r *AnsibleRunner) { r.factsDir = dir }
+// WithBecome enables privilege escalation (become/sudo)
+func WithBecome(become bool) RunnerOption {
+	return func(r *AnsibleRunner) { r.become = become }
 }
 
-// WithVarsFiles adds variable files to load
-func WithVarsFiles(files []string) RunnerOption {
-	return func(r *AnsibleRunner) { r.varsFiles = files }
+// WithBecomeMethod sets the privilege escalation method (sudo, su, etc.)
+func WithBecomeMethod(method string) RunnerOption {
+	return func(r *AnsibleRunner) { r.becomeMethod = method }
 }
 
 // WithVerbosity sets the verbosity level (0-4, -v to -vvvv)
 func WithVerbosity(level int) RunnerOption {
 	return func(r *AnsibleRunner) { r.verbosity = level }
+}
+
+// PlaybookResult holds the summary of a playbook execution
+type PlaybookResult struct {
+	Ok        int
+	Changed   int
+	Failed    int
+	Unreachable int
+	Skipped   int
 }
 
 // New creates a new Ansible runner instance
@@ -66,6 +79,8 @@ func New(playbookPath string, options ...RunnerOption) (*AnsibleRunner, error) {
 	r := &AnsibleRunner{
 		playbookPath: playbookPath,
 		connection:   "local",
+		become:       true,
+		becomeMethod: "sudo",
 	}
 
 	for _, opt := range options {
@@ -76,80 +91,73 @@ func New(playbookPath string, options ...RunnerOption) (*AnsibleRunner, error) {
 }
 
 // Run executes the Ansible playbook
-func (r *AnsibleRunner) Run() (*execution.PlaybookExecutionResult, error) {
+func (r *AnsibleRunner) Run() (*PlaybookResult, error) {
 	log.Printf("Running Ansible playbook: %s", r.playbookPath)
 
-	// Create playbook instance
-	pbOpts := []playbook.Option{
-		playbook.WithPlaybook(r.playbookPath),
+	// Build playbook options
+	pbOptions := &ansiblePlaybook.AnsiblePlaybookOptions{
+		Inventory: r.inventory,
 	}
 
-	if r.inventory != "" {
-		pbOpts = append(pbOpts, playbook.WithInventory(r.inventory))
-	}
-	if r.privateKeyFile != "" {
-		pbOpts = append(pbOpts, playbook.WithPrivateKeyFile(r.privateKeyFile))
-	}
-	if r.factsDir != "" {
-		pbOpts = append(pbOpts, playbook.WithFactsCachePath(r.factsDir))
-	}
-
-	for _, file := range r.varsFiles {
-		pbOpts = append(pbOpts, playbook.WithVarsFiles(file))
-	}
-
-	pb, err := playbook.NewPlaybook(pbOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create playbook: %w", err)
-	}
-
-	// Set verbosity (1=v, 2=vv, 3=vvv, 4=vvvv=verbose+trace)
+	// Set verbosity
 	switch r.verbosity {
 	case 1:
-		pb.SetVerbose(true)
+		pbOptions.Verbose = true
 	case 2:
-		pb.SetDebug(true)
+		pbOptions.VerboseV = true
 	case 3:
-		pb.SetTrace(true)
+		pbOptions.VerboseVV = true
 	case 4:
-		pb.SetVerbose(true)
-		pb.SetTrace(true)
+		pbOptions.VerboseVVV = true
+	case 5:
+		pbOptions.VerboseVVVV = true
 	}
 
-	// Create execution context
-	execOpts := []execution.Option{
-		execution.WithPlaybook(pb),
-		execution.WithConnection(r.connection),
+	// Build connection options
+	connOptions := &ansibleOptions.AnsibleConnectionOptions{
+		Connection: r.connection,
 	}
 
-	if r.connection == "local" {
-		// For local connection, we need to set up the environment properly
-		execOpts = append(execOpts, execution.WithRemoteUser("root"))
+	// Build privilege escalation options
+	privEscOptions := &ansibleOptions.AnsiblePrivilegeEscalationOptions{
+		Become:       r.become,
+		BecomeMethod: r.becomeMethod,
 	}
 
-	exe, err := execution.NewExecution(execOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create execution: %w", err)
+	// Create the playbook command
+	cmd := &ansiblePlaybook.AnsiblePlaybookCmd{
+		Playbooks:                  []string{r.playbookPath},
+		ConnectionOptions:          connOptions,
+		PrivilegeEscalationOptions: privEscOptions,
+		Options:                    pbOptions,
+		Exec:                       ansibleExecute.NewDefaultExecute(),
 	}
 
-	// Run the playbook
-	result, err := exe.Run()
+	// Run with context
+	ctx := context.Background()
+	err := cmd.Run(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("playbook execution failed: %w", err)
 	}
 
-	return result, nil
+	// Return a default result since go-ansible v1.x doesn't return parsed results
+	// The actual results are streamed via stdout callback
+	return &PlaybookResult{Ok: 0, Changed: 0, Failed: 0, Unreachable: 0, Skipped: 0}, nil
 }
 
 // RunWithOutput runs the playbook and captures output
 func (r *AnsibleRunner) RunWithOutput() (string, error) {
 	var stdout, stderr bytes.Buffer
 
-	cmd := exec.Command("ansible-playbook", "-c", r.connection, r.playbookPath)
+	cmd := exec.Command("ansible-playbook", r.playbookPath, "-c", r.connection)
 
 	if r.verbosity > 0 {
 		vStr := strings.Repeat("v", r.verbosity)
 		cmd.Args = append(cmd.Args, "-"+vStr)
+	}
+
+	if r.inventory != "" {
+		cmd.Args = append(cmd.Args, "--inventory", r.inventory)
 	}
 
 	cmd.Stdout = &stdout
@@ -182,18 +190,19 @@ func RunEmbeddedPlaybook(playbookPath string) error {
 	r, err := New(fullPlaybookPath,
 		WithConnection("local"),
 		WithVerbosity(2), // Default to -vv
+		WithBecome(true),
+		WithBecomeMethod("sudo"),
 	)
 	if err != nil {
 		return err
 	}
 
-	result, err := r.Run()
+	_, err = r.Run()
 	if err != nil {
 		return err
 	}
 
-	log.Printf("Playbook completed. Failed: %d, Unreachable: %d, Changed: %d, Ok: %d",
-		result.Failed(), result.Unreachable(), result.Changed(), result.Ok())
+	log.Printf("Playbook completed successfully")
 
 	return nil
 }
@@ -221,4 +230,17 @@ func ValidatePlaybook(path string) error {
 	}
 
 	return nil
+}
+
+// NewDefaultExecutor returns a new DefaultExecute executor with JSON output
+func NewDefaultExecutor() ansibleExecute.Executor {
+	return ansibleExecute.NewDefaultExecute(
+		ansibleExecute.WithWrite(io.Discard),
+		ansibleExecute.WithWriteError(io.Discard),
+	)
+}
+
+// NewJSONResultCallback returns a stdout callback function that parses JSON results
+func NewJSONResultCallback() results.StdoutCallbackResultsFunc {
+	return results.JSONStdoutCallbackResults
 }

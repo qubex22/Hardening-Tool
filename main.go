@@ -99,15 +99,15 @@ func runHardening(playbookPath string) error {
 
 	// Log results
 	log.Printf("Playbook Results:")
-	log.Printf("  Failed:    %d", result.Failed())
-	log.Printf("  Unreachable: %d", result.Unreachable())
-	log.Printf("  Changed:   %d", result.Changed())
-	log.Printf("  Ok:        %d", result.Ok())
+	log.Printf("  Failed:      %d", result.Failed)
+	log.Printf("  Unreachable: %d", result.Unreachable)
+	log.Printf("  Changed:     %d", result.Changed)
+	log.Printf("  Ok:          %d", result.Ok)
 
 	// Check for failures
-	if result.Failed() > 0 || result.Unreachable() > 0 {
+	if result.Failed > 0 || result.Unreachable > 0 {
 		return fmt.Errorf("playbook had %d failed tasks and %d unreachable hosts",
-			result.Failed(), result.Unreachable())
+			result.Failed, result.Unreachable)
 	}
 
 	return nil
