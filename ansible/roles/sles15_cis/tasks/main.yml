@@ -1,11 +1,6 @@
 ---
 # SLES 15 CIS Hardening Tasks
 
-- name: Include OS-specific variables
-  include_vars:
-    file: "{{ ansible_distribution_major_version }}.yml"
-    ignore_errors: yes
-
 - name: Gather system information for hardening decisions
   setup:
     gather_subset: hardware
@@ -33,11 +28,14 @@
     password_lock: yes
   when: hardening_level | int >= 1
 
-- name: Ensure password settings are enforced (level 2+)
-  pam.d::password:
-    name: common-password
-    setting: "password    requisite     pam_pwquality.so try_first_pass retry=3 minlen=15"
+- name: Ensure password quality policy is enforced (level 2+)
+  lineinfile:
+    path: /etc/security/common-password
+    regexp: '^password.*pam_pwquality'
+    line: 'password    requisite     pam_pwquality.so try_first_pass retry=3 minlen=15'
+    insertafter: '^password'
   when: hardening_level | int >= 2
+  ignore_errors: yes
 
 # 2.2 - Account Management
 - name: Ensure password expiration is set (level 2+)

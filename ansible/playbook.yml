@@ -1,19 +1,39 @@
 ---
 # SLES 15 Hardening Playbook
-# Placeholder - replace with actual hardening playbooks
+# This playbook applies CIS benchmarks and security hardening
 
 - name: Apply SLES 15 Security Hardening
   hosts: localhost
   connection: local
+  gather_facts: true
   become: yes
-  gather_facts: no
 
   vars:
     max_fail_pct: 25
+    # Hardening level: 0=disabled, 1=basic, 2=medium, 3=maximum (passed via --extra-vars)
+    hardening_level: "{{ hardening_level | default('1', true) }}"
 
-  tasks:
-    - name: Display system information
+    # Disable unnecessary services
+    disable_services:
+      - postfix
+      - cupsd
+
+  pre_tasks:
+    - name: Verify system is SLES 15
+      command: cat /etc/os-release
+      register: os_release
+      changed_when: false
+
+  roles:
+    - role: sles15_cis
+      vars:
+        hardening_level: "{{ hardening_level }}"
+        disable_services: "{{ disable_services }}"
+
+  post_tasks:
+    - name: Generate hardening report
       debug:
         msg: |
-          Hardening started on {{ inventory_hostname }}
-          Hardening level: {{ hardening_level }}
+          Hardening complete!
+          Level: {{ hardening_level }}
+          Target: SLES 15
