@@ -62,3 +62,80 @@ func TestValidatePlaybookNotFound(t *testing.T) {
 		t.Error("Expected error for nonexistent playbook")
 	}
 }
+
+func TestParsePlaybookOutput(t *testing.T) {
+	testOutput := `
+PLAY [Apply SLES 15 Security Hardening] *****************************************
+
+TASK [Gathering Facts] **********************************************************
+ok: [localhost]
+
+TASK [Verify system is SLES 15] *************************************************
+changed: [localhost]
+
+TASK [sles15_cis : Apply basic hardening] ***************************************
+changed: [localhost]
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=3    changed=2    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0
+`
+
+	result := ParsePlaybookOutput(testOutput)
+
+	if result.Ok != 3 {
+		t.Errorf("Expected 3 ok, got %d", result.Ok)
+	}
+	if result.Changed != 2 {
+		t.Errorf("Expected 2 changed, got %d", result.Changed)
+	}
+	if result.Failed != 0 {
+		t.Errorf("Expected 0 failed, got %d", result.Failed)
+	}
+	if result.Unreachable != 0 {
+		t.Errorf("Expected 0 unreachable, got %d", result.Unreachable)
+	}
+	if result.Skipped != 1 {
+		t.Errorf("Expected 1 skipped, got %d", result.Skipped)
+	}
+}
+
+func TestParsePlaybookOutputWithFailure(t *testing.T) {
+	testOutput := `
+PLAY RECAP *********************************************************************
+localhost                  : ok=2    changed=1    unreachable=1    failed=1    skipped=0    rescued=0    ignored=0
+`
+
+	result := ParsePlaybookOutput(testOutput)
+
+	if result.Failed != 1 {
+		t.Errorf("Expected 1 failed, got %d", result.Failed)
+	}
+	if result.Unreachable != 1 {
+		t.Errorf("Expected 1 unreachable, got %d", result.Unreachable)
+	}
+}
+
+func TestParsePlaybookOutputEmpty(t *testing.T) {
+	result := ParsePlaybookOutput("")
+
+	if result.Ok != 0 || result.Changed != 0 || result.Failed != 0 {
+		t.Errorf("Expected all zeros for empty output, got: %+v", result)
+	}
+}
+
+func TestParsePlaybookOutputMultipleHosts(t *testing.T) {
+	testOutput := `
+PLAY RECAP *********************************************************************
+node1.example.com          : ok=5    changed=2    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0
+node2.example.com          : ok=5    changed=2    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0
+`
+
+	result := ParsePlaybookOutput(testOutput)
+
+	if result.Ok != 10 {
+		t.Errorf("Expected 10 ok (5+5), got %d", result.Ok)
+	}
+	if result.Changed != 4 {
+		t.Errorf("Expected 4 changed (2+2), got %d", result.Changed)
+	}
+}

@@ -12,6 +12,7 @@ import (
 	"harden-sles15/ansible_runner"
 	"harden-sles15/fingerprint"
 	"harden-sles15/license"
+	"harden-sles15/python"
 )
 
 //go:embed ansible/playbook.yml
@@ -32,6 +33,28 @@ func main() {
 	log.Println("  SLES 15 Hardening Tool v1.0.0")
 	log.Println("========================================")
 
+	// Initialize embedded Python runtime
+	log.Println("\n[Initializing embedded Python runtime...]")
+	pyRuntime, err := python.New()
+	if err != nil {
+		log.Fatalf("Failed to initialize embedded Python: %v", err)
+	}
+	defer pyRuntime.Cleanup()
+
+	if err := pyRuntime.Verify(); err != nil {
+		log.Fatalf("Python verification failed: %v", err)
+	}
+	log.Println("Embedded Python runtime ready.")
+
+	pythonDir := pyRuntime.GetPythonDir()
+	ansiblePlaybookPath := pyRuntime.GetAnsiblePlaybookPath()
+
+	if ansiblePlaybookPath == "" {
+		log.Fatalf("ansible-playbook not found in embedded Python assets. " +
+			"Please ensure ansible is installed in the build assets.")
+	}
+	log.Printf("ansible-playbook path: %s", ansiblePlaybookPath)
+
 	// Step 1: Collect device fingerprint
 	log.Println("\n[Step 1/4] Collecting device fingerprint...")
 	fp, err := fingerprint.Collect()
@@ -46,7 +69,6 @@ func main() {
 	authorized, msg := license.VerifyFingerprint(fp.Hash)
 	if !authorized {
 		log.Fatalf("%s\n\nThis device is not authorized for hardening.\n"+
-
 			"To request authorization, submit this fingerprint to support:\n%s",
 			msg, fp.GetHash())
 	}
@@ -74,7 +96,7 @@ func main() {
 
 	// Step 4: Run Ansible playbook
 	log.Println("\n[Step 4/4] Running hardening playbook...")
-	if err := runHardening(playbookPath, level); err != nil {
+	if err := runHardening(playbookPath, level, pythonDir, ansiblePlaybookPath); err != nil {
 		log.Fatalf("Playbook execution failed: %v", err)
 	}
 
@@ -93,7 +115,7 @@ func main() {
 	fmt.Printf("\nFinal fingerprint for compliance report:\n%s\n", fp.GetHash())
 }
 
-func runHardening(playbookPath string, level int) error {
+func runHardening(playbookPath string, level int, pythonDir string, ansiblePlaybookPath string) error {
 	// Validate playbook
 	if err := ansible_runner.ValidatePlaybook(playbookPath); err != nil {
 		return fmt.Errorf("playbook validation failed: %w", err)
@@ -106,6 +128,8 @@ func runHardening(playbookPath string, level int) error {
 		ansible_runner.WithExtraVars(map[string]interface{}{
 			"hardening_level": strconv.Itoa(level),
 		}),
+		ansible_runner.WithPythonDir(pythonDir),
+		ansible_runner.WithAnsiblePlaybook(ansiblePlaybookPath),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create runner: %w", err)

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/kluctl/go-embed-python/python"
 )
@@ -61,6 +62,11 @@ func (r *PythonRuntime) GetPythonDir() string {
 	return r.ep.GetExtractedPath()
 }
 
+// GetPythonExe returns the path to the embedded Python executable
+func (r *PythonRuntime) GetPythonExe() string {
+	return r.ep.GetExePath()
+}
+
 // Verify checks if Python is properly initialized
 func (r *PythonRuntime) Verify() error {
 	pythonBin := r.ep.GetExePath()
@@ -68,6 +74,129 @@ func (r *PythonRuntime) Verify() error {
 		return fmt.Errorf("embedded Python binary not found at %s: %w", pythonBin, err)
 	}
 	return nil
+}
+
+// GetAnsiblePlaybookPath returns the path to ansible-playbook in the embedded Python environment
+func (r *PythonRuntime) GetAnsiblePlaybookPath() string {
+	extractedPath := r.ep.GetExtractedPath()
+
+	// Try common locations
+	candidates := []string{
+		filepath.Join(extractedPath, "bin", "ansible-playbook"),
+		filepath.Join(extractedPath, "Scripts", "ansible-playbook.exe"),
+	}
+
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	// Search for ansible-playbook.py in site-packages
+	var sitePackagesPattern string
+	if runtime.GOOS == "windows" {
+		sitePackagesPattern = filepath.Join(extractedPath, "lib", "site-packages")
+	} else {
+		sitePackagesPattern = filepath.Join(extractedPath, "lib", "python*", "site-packages")
+	}
+
+	// Check if the pattern directory exists (glob may not work with os.Stat)
+	if _, err := os.Stat(sitePackagesPattern); err == nil {
+		var foundPath string
+		err := filepath.Walk(filepath.Dir(sitePackagesPattern), func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if info.IsDir() && info.Name() == "site-packages" {
+				ansiblePath := filepath.Join(path, "ansible", "cli", "ansible_playbook.py")
+				if _, err := os.Stat(ansiblePath); err == nil {
+					foundPath = ansiblePath
+					return fmt.Errorf("found")
+				}
+			}
+			return nil
+		})
+		if err == nil || foundPath != "" {
+			if foundPath != "" {
+				return foundPath
+			}
+		}
+	}
+
+	// Also try walking the entire extracted path as fallback
+	var finalPath string
+	filepath.Walk(extractedPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() && info.Name() == "ansible_playbook.py" {
+			finalPath = path
+			return fmt.Errorf("found")
+		}
+		return nil
+	})
+	if finalPath != "" {
+		return finalPath
+	}
+
+	return ""
+}
+
+// SetupAnsibleEnv configures environment variables for running ansible with embedded Python
+func SetupAnsibleEnv(cmd *exec.Cmd, pythonDir string) {
+	if pythonDir == "" {
+		return
+	}
+
+	// Get existing env or use current process env
+	currentEnv := cmd.Env
+	if len(currentEnv) == 0 {
+		currentEnv = os.Environ()
+	}
+
+	// Build new env with Python paths
+	var newEnv []string
+	for _, env := range currentEnv {
+		// Remove any existing PATH/PYTHONPATH that might conflict
+		if !startsWith(env, "PATH=") && !startsWith(env, "PYTHONPATH=") {
+			newEnv = append(newEnv, env)
+		}
+	}
+
+	// Add Python bin directory to PATH
+	var binDir string
+	if runtime.GOOS == "windows" {
+		binDir = filepath.Join(pythonDir, "Scripts")
+	} else {
+		binDir = filepath.Join(pythonDir, "bin")
+	}
+
+	if _, err := os.Stat(binDir); err == nil {
+		pathEnv := os.Getenv("PATH")
+		if runtime.GOOS == "windows" {
+			newEnv = append(newEnv, fmt.Sprintf("PATH=%s;%s", binDir, pathEnv))
+		} else {
+			newEnv = append(newEnv, fmt.Sprintf("PATH=%s:%s", binDir, pathEnv))
+		}
+	}
+
+	// Set PYTHONPATH to include the extracted Python directory
+	newEnv = append(newEnv, fmt.Sprintf("PYTHONPATH=%s", pythonDir))
+
+	// Set LD_LIBRARY_PATH for Linux so embedded Python can find its libraries
+	if runtime.GOOS == "linux" {
+		ldPath := os.Getenv("LD_LIBRARY_PATH")
+		libDir := filepath.Join(pythonDir, "lib")
+		if _, err := os.Stat(libDir); err == nil {
+			if ldPath != "" {
+				newEnv = append(newEnv, fmt.Sprintf("LD_LIBRARY_PATH=%s:%s", libDir, ldPath))
+			} else {
+				newEnv = append(newEnv, fmt.Sprintf("LD_LIBRARY_PATH=%s", libDir))
+			}
+		}
+	}
+
+	cmd.Env = newEnv
 }
 
 // RunAnsiblePlaybook runs an Ansible playbook using the embedded Python/Ansible
@@ -105,4 +234,9 @@ func (r *PythonRuntime) Cleanup() {
 	if r.ep != nil {
 		r.ep.Cleanup()
 	}
+}
+
+// startsWith checks if a string starts with a given prefix (handles "KEY=value" format)
+func startsWith(s, prefix string) bool {
+	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
 }

@@ -126,18 +126,19 @@ harden-sles15/
 │
 ├── ansible/                 # Embedded playbook and roles
 │   ├── playbook.yml         # Top-level playbook
-│   └── roles/sles_cis/      # CIS hardening role
+│   └── roles/sles15_cis/    # CIS hardening role
 │
 ├── python/                  # Embedded Python runtime (via go-embed-python)
-│   ├── py_embed.go          # Python asset extraction
-│   └── runtime.go           # Runtime management
+│   ├── py_embed.go          # Python asset extraction helper
+│   ├── runtime.go           # Runtime management + ansible-playbook path detection
+│   └── assets/              # Bundled Python + ansible-core (populated at build time)
 │
-├── ansible_runner/          # Go wrapper around go-ansible
-│   ├── runner.go            # Playbook execution logic
-│   └── runner_test.go       # Tests
+├── ansible_runner/          # Embedded ansible execution (no external deps)
+│   ├── runner.go            # Subprocess-based playbook execution with embedded Python
+│   └── runner_test.go       # Tests for output parsing and validation
 │
 ├── tests/
-│   ├── sles_15_test_vm/     # CI-friendly VM setup instructions
+│   ├── sles15_test_vm/     # CI-friendly VM setup instructions
 │   └── test_fingerprint.sh
 │
 ├── .dockerignore
@@ -174,8 +175,37 @@ chmod +x build.sh
 
 This automates:
 1. `go mod tidy` — ensuring dependency checksums
-2. Extracting embedded Python assets
-3. Cross-compiling for Linux/amd64
+2. Extracting embedded Python runtime via `go-embed-python`
+3. Installing `ansible-core` into the embedded Python environment
+4. Bundling Python + Ansible into `python/assets/` for embedding
+5. Cross-compiling for Linux/amd64
+
+## How Ansible Is Bundled
+
+The binary ships with a fully embedded Python runtime and `ansible-core`, requiring **zero external dependencies** on the target SLES 15 system.
+
+### Build Flow
+
+1. `go-embed-python` extracts a Linux Python binary into a staging directory
+2. `pip install ansible-core` installs Ansible into that Python environment
+3. The entire `python/assets/` directory is embedded into the binary via `//go:embed`
+
+### Runtime Flow
+
+1. On startup, the embedded Python is extracted to a temp directory
+2. `ansible-playbook` is located within the embedded Python's `bin/` or `site-packages/`
+3. Environment variables (`PATH`, `PYTHONPATH`, `LD_LIBRARY_PATH`) are configured so the subprocess finds all bundled libraries
+4. The playbook runs as a subprocess with the correct environment — no system Python or Ansible required
+
+### Dependencies
+
+| Dependency | Bundled? | Required on Target |
+|------------|----------|-------------------|
+| Python 3.x | Yes (embedded) | No |
+| ansible-core | Yes (pip-installed into embedded Python) | No |
+| ansible-playbook | Yes (in embedded Python bin/) | No |
+| System Python | No | No |
+| System Ansible | No | No |
 
 ## Security Model
 
@@ -240,7 +270,7 @@ Tests run automatically via GitHub Actions on:
 Jobs:
 
 1. **compile-check** — validates imports, runs tests, cross-compiles
-2. **build-with-docker** — full build with embedded Python via golang:1.21-bookworm
+2. **build-with-docker** — full build with embedded Python + Ansible via golang:1.21-bookworm
 3. **test-fingerprint** — validates fingerprint collection
 4. **integration-test** — tests license and ansible_runner packages
 
