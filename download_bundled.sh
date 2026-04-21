@@ -34,6 +34,7 @@ if ansible-galaxy collection download ansible.posix -p . 2>/dev/null; then
 else
     # Fallback: install then package
     echo "Fallback: installing then packaging..."
+    mkdir -p "$TMPDIR_BUILD/galaxy/installed"
     ansible-galaxy collection install ansible.posix --collections-path "$TMPDIR_BUILD/galaxy/installed" 2>&1 || {
         echo "ERROR: Failed to download ansible.posix collection"
         exit 1
