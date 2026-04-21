@@ -6,10 +6,14 @@
     gather_subset: hardware
 
 # 1.1 - Filesystem Configuration
-- name: Ensure /tmp is mounted as tmpfs with correct permissions (level 1+)
-  command: mount -t tmpfs tmpfs /tmp -o defaults,noexec,nosuid,rw
+- name: Ensure /tmp partition exists with correct permissions
+  mount:
+    name: /tmp
+    fstype: tmpfs
+    opts: "defaults,noexec,nosuid,rw"
+    dump: "0"
+    passnum: "0"
   when: hardening_level | int >= 1
-  ignore_errors: yes
 
 # 1.2 - Disk Partitioning
 - name: Verify disk encryption is enabled (if LVM available)

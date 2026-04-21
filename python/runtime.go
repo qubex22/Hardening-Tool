@@ -81,7 +81,15 @@ func (r *PythonRuntime) ensureAnsible() error {
 		return fmt.Errorf("pip install ansible-core failed: %w", err)
 	}
 
-	// All modules used are from ansible.builtin (core), no extra collections needed
+	// Install required ansible collections
+	fmt.Println("Installing ansible collections...")
+	collectionDir := filepath.Join(r.ep.GetExtractedPath(), "lib", "ansible_collections")
+	galaxyCmd := exec.Command(pythonExe, "-m", "ansible-galaxy", "collection", "install", "ansible.posix", "--collections-path", collectionDir, "--ignore-certs")
+	if output, err := galaxyCmd.CombinedOutput(); err != nil {
+		fmt.Printf("ansible-galaxy output: %s\n", string(output))
+		return fmt.Errorf("failed to install ansible collections: %w", err)
+	}
+	fmt.Println("Ansible collections installed successfully.")
 	return nil
 }
 
