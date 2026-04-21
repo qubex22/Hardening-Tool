@@ -315,9 +315,8 @@ func (r *AnsibleRunner) setupEnv(cmd *exec.Cmd) {
 	} else {
 		collectionsPath = filepath.Join(r.pythonDir, "lib", "ansible_collections")
 	}
-	if _, err := os.Stat(collectionsPath); err == nil {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("ANSIBLE_COLLECTIONS_PATH=%s", collectionsPath))
-	}
+	// Always set ANSIBLE_COLLECTIONS_PATH — the directory may be created at runtime
+	cmd.Env = append(cmd.Env, fmt.Sprintf("ANSIBLE_COLLECTIONS_PATH=%s", collectionsPath))
 }
 
 // parsePlaybookOutput parses ansible-playbook output to extract results

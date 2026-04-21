@@ -44,12 +44,16 @@ func (r *PythonRuntime) ensureAnsible() error {
 	checkCmd := exec.Command(pythonExe, "-c", "import ansible; print(ansible.__version__)")
 	if output, err := checkCmd.CombinedOutput(); err == nil {
 		fmt.Printf("Ansible %s already installed.\n", strings.TrimSpace(string(output)))
-		return nil
+	} else {
+		// Install from bundled packages (no network required)
+		if err := InstallBundledAnsible(r.ep.GetExtractedPath()); err != nil {
+			return fmt.Errorf("failed to install bundled ansible: %w", err)
+		}
 	}
 
-	// Install from bundled packages (no network required)
-	if err := InstallBundledAnsible(r.ep.GetExtractedPath()); err != nil {
-		return fmt.Errorf("failed to install bundled ansible: %w", err)
+	// Always ensure ansible.posix collection is installed from bundled assets
+	if err := ensureAnsiblePosixCollection(pythonExe, r.ep.GetExtractedPath()); err != nil {
+		return fmt.Errorf("failed to install ansible.posix collection: %w", err)
 	}
 
 	return nil
