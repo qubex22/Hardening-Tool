@@ -26,6 +26,7 @@ type AnsibleRunner struct {
 	become         bool
 	becomeMethod   string
 	verbosity      int
+	extraVars      map[string]interface{}
 }
 
 // RunnerOption configures an AnsibleRunner
@@ -59,6 +60,11 @@ func WithBecomeMethod(method string) RunnerOption {
 // WithVerbosity sets the verbosity level (0-4, -v to -vvvv)
 func WithVerbosity(level int) RunnerOption {
 	return func(r *AnsibleRunner) { r.verbosity = level }
+}
+
+// WithExtraVars sets extra variables to pass to the playbook
+func WithExtraVars(vars map[string]interface{}) RunnerOption {
+	return func(r *AnsibleRunner) { r.extraVars = vars }
 }
 
 // PlaybookResult holds the summary of a playbook execution
@@ -97,6 +103,7 @@ func (r *AnsibleRunner) Run() (*PlaybookResult, error) {
 	// Build playbook options
 	pbOptions := &ansiblePlaybook.AnsiblePlaybookOptions{
 		Inventory: r.inventory,
+		ExtraVars: r.extraVars,
 	}
 
 	// Set verbosity

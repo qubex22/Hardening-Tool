@@ -2,10 +2,12 @@ package main
 
 import (
 	"embed"
+	"flag"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"harden-sles15/ansible_runner"
 	"harden-sles15/fingerprint"
@@ -16,6 +18,16 @@ import (
 var playbookFS embed.FS
 
 func main() {
+	var level int
+	flag.IntVar(&level, "level", 1, "Hardening level (0=disabled, 1=basic, 2=medium, 3=maximum)")
+	flag.Parse()
+
+	if level < 0 || level > 3 {
+		log.Fatalf("Invalid hardening level: %d (must be 0-3)", level)
+	}
+
+	log.Printf("Hardening level: %d", level)
+
 	log.Println("========================================")
 	log.Println("  SLES 15 Hardening Tool v1.0.0")
 	log.Println("========================================")
@@ -62,7 +74,7 @@ func main() {
 
 	// Step 4: Run Ansible playbook
 	log.Println("\n[Step 4/4] Running hardening playbook...")
-	if err := runHardening(playbookPath); err != nil {
+	if err := runHardening(playbookPath, level); err != nil {
 		log.Fatalf("Playbook execution failed: %v", err)
 	}
 
@@ -81,7 +93,7 @@ func main() {
 	fmt.Printf("\nFinal fingerprint for compliance report:\n%s\n", fp.GetHash())
 }
 
-func runHardening(playbookPath string) error {
+func runHardening(playbookPath string, level int) error {
 	// Validate playbook
 	if err := ansible_runner.ValidatePlaybook(playbookPath); err != nil {
 		return fmt.Errorf("playbook validation failed: %w", err)
@@ -91,6 +103,9 @@ func runHardening(playbookPath string) error {
 	r, err := ansible_runner.New(playbookPath,
 		ansible_runner.WithConnection("local"),
 		ansible_runner.WithVerbosity(2), // -vv
+		ansible_runner.WithExtraVars(map[string]interface{}{
+			"hardening_level": strconv.Itoa(level),
+		}),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create runner: %w", err)

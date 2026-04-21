@@ -213,7 +213,17 @@ Nonce = RSA-generated (12 bytes, crypto/rand)
 | 2 | Medium: password policy, audit logging |
 | 3 | Maximum: full CIS compliance |
 
-Set via `HARDENING_LEVEL` environment variable.
+Set via the `--level` flag:
+
+```bash
+sudo ./harden-sles15.bin --level 1
+sudo ./harden-sles15.bin --level 2
+sudo ./harden-sles15.bin --level 3
+sudo ./harden-sles15.bin --level 0    # disabled
+
+# Default is level 1 if --level is omitted
+sudo ./harden-sles15.bin
+```
 
 ## License
 
