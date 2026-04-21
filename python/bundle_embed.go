@@ -25,7 +25,8 @@ func InstallBundledAnsible(pythonDir string) error {
 	defer os.RemoveAll(tmpDir)
 
 	// Extract bundled files to temp dir (skip .placeholder files)
-	if err := fs.WalkDir(bundledFS, "bundled", func(path string, d fs.DirEntry, err error) error {
+	// go:embed bundled embeds the *contents* of the bundled/ directory
+	if err := fs.WalkDir(bundledFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -45,9 +46,15 @@ func InstallBundledAnsible(pythonDir string) error {
 		return fmt.Errorf("failed to extract bundled packages: %w", err)
 	}
 
-	pythonExe := filepath.Join(pythonDir, "bin", "python")
+	var pythonExe string
 	if runtime.GOOS == "windows" {
 		pythonExe = filepath.Join(pythonDir, "Scripts", "python.exe")
+	} else {
+		pythonExe = filepath.Join(pythonDir, "bin", "python3")
+		// Fallback to 'python' if 'python3' doesn't exist
+		if _, err := os.Stat(pythonExe); err != nil {
+			pythonExe = filepath.Join(pythonDir, "bin", "python")
+		}
 	}
 
 	// Install ansible-core from bundled wheels (no network)
@@ -70,8 +77,27 @@ func InstallBundledAnsible(pythonDir string) error {
 
 // getAnsibleCollectionsDir returns the ansible_collections directory path
 func getAnsibleCollectionsDir(pythonDir string) string {
+	// Try the top-level ansible_collections first (what ansible-galaxy creates)
 	if runtime.GOOS == "windows" {
+		candidates := []string{
+			filepath.Join(pythonDir, "Lib", "ansible_collections"),
+			filepath.Join(pythonDir, "Lib", "site-packages", "ansible_collections"),
+		}
+		for _, c := range candidates {
+			if _, err := os.Stat(c); err == nil {
+				return c
+			}
+		}
 		return filepath.Join(pythonDir, "Lib", "ansible_collections")
+	}
+	candidates := []string{
+		filepath.Join(pythonDir, "lib", "ansible_collections"),
+		filepath.Join(pythonDir, "lib", "python3", "site-packages", "ansible_collections"),
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
 	}
 	return filepath.Join(pythonDir, "lib", "ansible_collections")
 }

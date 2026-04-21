@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -193,9 +194,17 @@ func (r *AnsibleRunner) buildCmd(stdout, stderr io.Writer) *exec.Cmd {
 	if strings.HasSuffix(ansiblePath, ".py") {
 		pythonPath := "python3"
 		if r.pythonDir != "" {
-			pythonPath = filepath.Join(r.pythonDir, "bin", "python")
-			if _, err := os.Stat(pythonPath); err != nil {
-				pythonPath = "python3"
+			// Try platform-specific python executable
+			candidates := []string{
+				filepath.Join(r.pythonDir, "bin", "python3"),
+				filepath.Join(r.pythonDir, "bin", "python"),
+				filepath.Join(r.pythonDir, "Scripts", "python.exe"),
+			}
+			for _, candidate := range candidates {
+				if _, err := os.Stat(candidate); err == nil {
+					pythonPath = candidate
+					break
+				}
 			}
 		}
 		cmd = exec.Command(pythonPath, ansiblePath)
@@ -268,15 +277,25 @@ func setupAnsibleEnv(cmd *exec.Cmd, pythonDir string) {
 	}
 
 	// Add Python bin directory to PATH
-	binDir := filepath.Join(pythonDir, "bin")
-	if _, err := os.Stat(binDir); err == nil {
-		newEnv = append(newEnv, fmt.Sprintf("PATH=%s:%s", binDir, os.Getenv("PATH")))
-	} else {
-		// Try Scripts dir (Windows)
+	var binDir string
+	var pathSep string
+	if runtime.GOOS == "windows" {
 		binDir = filepath.Join(pythonDir, "Scripts")
-		if _, err := os.Stat(binDir); err == nil {
-			newEnv = append(newEnv, fmt.Sprintf("PATH=%s;%s", binDir, os.Getenv("PATH")))
+		pathSep = ";"
+	} else {
+		binDir = filepath.Join(pythonDir, "bin")
+		pathSep = ":"
+	}
+	if _, err := os.Stat(binDir); err == nil {
+		// Extract existing PATH from the original env
+		hostPath := ""
+		for _, e := range currentEnv {
+			if strings.HasPrefix(e, "PATH=") {
+				hostPath = e[5:]
+				break
+			}
 		}
+		newEnv = append(newEnv, fmt.Sprintf("PATH=%s%s%s", binDir, pathSep, hostPath))
 	}
 
 	// Set PYTHONPATH to include site-packages
@@ -290,7 +309,12 @@ func (r *AnsibleRunner) setupEnv(cmd *exec.Cmd) {
 	setupAnsibleEnv(cmd, r.pythonDir)
 
 	// Add ANSIBLE_COLLECTIONS_PATH so ansible finds bundled collections
-	collectionsPath := filepath.Join(r.pythonDir, "lib", "ansible_collections")
+	var collectionsPath string
+	if runtime.GOOS == "windows" {
+		collectionsPath = filepath.Join(r.pythonDir, "Lib", "ansible_collections")
+	} else {
+		collectionsPath = filepath.Join(r.pythonDir, "lib", "ansible_collections")
+	}
 	if _, err := os.Stat(collectionsPath); err == nil {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("ANSIBLE_COLLECTIONS_PATH=%s", collectionsPath))
 	}

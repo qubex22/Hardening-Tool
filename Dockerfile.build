@@ -5,7 +5,7 @@
 # Build the Go project
 FROM golang:1.21-bookworm AS builder
 
-RUN apt-get update && apt-get install -y python3-venv python3 python3-pip && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y python3-venv python3 python3-pip python3-setuptools && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
@@ -19,6 +19,30 @@ COPY . .
 
 # Make build script executable
 RUN chmod +x build.sh
+
+# Download and bundle ansible-core wheels and ansible.posix collection
+# This step requires internet but only runs at build time
+RUN mkdir -p python/bundled && \
+    TMPDIR_BUILD=$(mktemp -d) && \
+    python3 -m venv "$TMPDIR_BUILD/venv" && \
+    source "$TMPDIR_BUILD/venv/bin/activate" && \
+    pip wheel --wheel-dir "$TMPDIR_BUILD/wheels" --no-cache-dir ansible-core && \
+    ansible-galaxy collection install ansible.posix --roles-path "$TMPDIR_BUILD/galaxy" || true && \
+    if [ -d "$TMPDIR_BUILD/galaxy/ansible_collections/ansible/posix" ]; then \
+        mkdir -p "$TMPDIR_BUILD/galaxy/tarball" && \
+        cp -r "$TMPDIR_BUILD/galaxy/ansible_collections" "$TMPDIR_BUILD/galaxy/tarball/" && \
+        cd "$TMPDIR_BUILD/galaxy/tarball" && \
+        tar -czf "$TMPDIR_BUILD/ansible-posix.tar.gz" ansible_collections/ && \
+        cd /build && \
+        cp "$TMPDIR_BUILD/ansible-posix.tar.gz" python/bundled/ && \
+        echo "ansible.posix collection bundled"; \
+    else \
+        echo "WARNING: ansible.posix collection download failed"; \
+    fi && \
+    cp "$TMPDIR_BUILD/wheels"/* python/bundled/ 2>/dev/null || true && \
+    source "$TMPDIR_BUILD/venv/bin/deactivate" && \
+    rm -rf "$TMPDIR_BUILD" && \
+    echo "Bundled packages:" && ls -lh python/bundled/
 
 # Run the build
 RUN ./build.sh

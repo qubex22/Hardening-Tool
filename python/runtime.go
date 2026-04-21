@@ -130,23 +130,21 @@ func (r *PythonRuntime) GetAnsiblePlaybookPath() string {
 	// Check if the pattern directory exists (glob may not work with os.Stat)
 	if _, err := os.Stat(sitePackagesPattern); err == nil {
 		var foundPath string
-		err := filepath.Walk(filepath.Dir(sitePackagesPattern), func(path string, info os.FileInfo, err error) error {
+		filepath.Walk(filepath.Dir(sitePackagesPattern), func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
 			}
 			if info.IsDir() && info.Name() == "site-packages" {
 				ansiblePath := filepath.Join(path, "ansible", "cli", "ansible_playbook.py")
-				if _, err := os.Stat(ansiblePath); err == nil {
+				if _, statErr := os.Stat(ansiblePath); statErr == nil {
 					foundPath = ansiblePath
 					return fmt.Errorf("found")
 				}
 			}
 			return nil
 		})
-		if err == nil || foundPath != "" {
-			if foundPath != "" {
-				return foundPath
-			}
+		if foundPath != "" {
+			return foundPath
 		}
 	}
 
@@ -199,11 +197,18 @@ func SetupAnsibleEnv(cmd *exec.Cmd, pythonDir string) {
 	}
 
 	if _, err := os.Stat(binDir); err == nil {
-		pathEnv := os.Getenv("PATH")
+		// Extract existing PATH from newEnv (which already excludes old PATH/PYTHONPATH)
+		hostPath := ""
+		for _, e := range os.Environ() {
+			if strings.HasPrefix(e, "PATH=") {
+				hostPath = e[5:]
+				break
+			}
+		}
 		if runtime.GOOS == "windows" {
-			newEnv = append(newEnv, fmt.Sprintf("PATH=%s;%s", binDir, pathEnv))
+			newEnv = append(newEnv, fmt.Sprintf("PATH=%s;%s", binDir, hostPath))
 		} else {
-			newEnv = append(newEnv, fmt.Sprintf("PATH=%s:%s", binDir, pathEnv))
+			newEnv = append(newEnv, fmt.Sprintf("PATH=%s:%s", binDir, hostPath))
 		}
 	}
 
