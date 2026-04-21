@@ -152,7 +152,7 @@ func findAnsiblePlaybookInPythonDir(pythonDir string) string {
 func (r *AnsibleRunner) Run() (*PlaybookResult, error) {
 	output, err := r.RunWithOutput()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w\nAnsible output:\n%s", err, output)
 	}
 
 	result := parsePlaybookOutput(output)
