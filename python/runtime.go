@@ -1,7 +1,6 @@
 package python
 
 import (
-	"embed"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,9 +9,6 @@ import (
 
 	"github.com/kluctl/go-embed-python/python"
 )
-
-//go:embed assets/*
-var assetsFS embed.FS
 
 // PythonRuntime manages the embedded Python environment
 type PythonRuntime struct {
