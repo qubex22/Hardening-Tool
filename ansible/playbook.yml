@@ -4,22 +4,13 @@
 
 - name: Apply SLES 15 Security Hardening
   hosts: all
-  gather_facts: true
   become: yes
   max_fail_pct: 25
   serial: 1
 
-  pre_tasks:
+  tasks:
     - name: Display system information
       debug:
         msg: |
-          Hardening started on {{ ansible_hostname }}
-          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
-
-  post_tasks:
-    - name: Generate hardening report
-      debug:
-        msg: |
-          Hardening complete!
-          Level: {{ hardening_level }}
-          Target: SLES 15
+          Hardening started on {{ inventory_hostname }}
+          Hardening level: {{ hardening_level }}
