@@ -27,7 +27,7 @@ python3 -m venv "$TMPDIR_BUILD/venv"
 source "$TMPDIR_BUILD/venv/bin/activate"
 
 # Install ansible-core to get all its dependencies as wheels
-pip install --wheel-dir "$TMPDIR_BUILD/wheels" --no-cache-dir ansible-core
+pip wheel --wheel-dir "$TMPDIR_BUILD/wheels" --no-cache-dir ansible-core
 
 # Download ansible.posix collection
 ansible-galaxy collection install ansible.posix --roles-path "$TMPDIR_BUILD/galaxy" 2>/dev/null || true
