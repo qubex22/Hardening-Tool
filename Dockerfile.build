@@ -9,6 +9,7 @@ WORKDIR /build
 
 # Copy go module files for dependency caching
 COPY go.mod .
+RUN go mod tidy || true
 RUN go mod download
 
 # Copy full source code

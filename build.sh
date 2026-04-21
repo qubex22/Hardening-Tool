@@ -14,8 +14,8 @@ export CGO_ENABLED=1
 # Step 1: Ensure go.sum is up to date
 echo ""
 echo "[1/4] Validating dependencies..."
-go mod download
 go mod tidy
+go mod download
 
 # Step 2: Build embedded Python assets
 echo ""
