@@ -57,13 +57,13 @@ func (r *PythonRuntime) ensureAnsible() error {
 		getPipUrl := "https://bootstrap.pypa.io/get-pip.py"
 		getPipCmd := exec.Command(pythonExe, "-c", fmt.Sprintf(
 			"import urllib.request; urllib.request.urlretrieve(%q, '/tmp/get-pip.py')", getPipUrl))
-		if out, err := getPipCmd.CombinedOutput(); err != nil {
+		if _, err := getPipCmd.CombinedOutput(); err != nil {
 			// Try http fallback
 			getPipUrl = "http://bootstrap.pypa.io/get-pip.py"
 			getPipCmd = exec.Command(pythonExe, "-c", fmt.Sprintf(
 				"import urllib.request; urllib.request.urlretrieve(%q, '/tmp/get-pip.py')", getPipUrl))
-			if out, err := getPipCmd.CombinedOutput(); err != nil {
-				return fmt.Errorf("failed to download get-pip.py: %w: %s", err, string(out))
+			if _, err := getPipCmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("failed to download get-pip.py: %w", err)
 			}
 		}
 		installPipCmd := exec.Command(pythonExe, "/tmp/get-pip.py", "--quiet")
