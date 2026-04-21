@@ -4,6 +4,7 @@ import (
 	"embed"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -15,8 +16,32 @@ import (
 	"harden_sles15/python"
 )
 
-//go:embed ansible/playbook.yml
+//go:embed ansible/playbook.yml ansible/roles
 var playbookFS embed.FS
+
+// extractEmbeddedDir extracts a directory from the embedded filesystem to disk
+func extractEmbeddedDir(f embed.FS, src, dst string) error {
+	return fs.WalkDir(f, src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if err := os.MkdirAll(filepath.Join(dst, path), 0755); err != nil {
+				return err
+			}
+			return nil
+		}
+		content, err := f.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		outPath := filepath.Join(dst, path)
+		if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
+			return err
+		}
+		return os.WriteFile(outPath, content, 0644)
+	})
+}
 
 func main() {
 	var level int
@@ -74,7 +99,7 @@ func main() {
 	}
 	log.Println("License validation successful.")
 
-	// Step 3: Extract embedded playbook
+	// Step 3: Extract embedded playbook and roles
 	log.Println("\n[Step 3/4] Preparing embedded assets...")
 	playbookContent, err := playbookFS.ReadFile("ansible/playbook.yml")
 	if err != nil {
@@ -92,7 +117,13 @@ func main() {
 	if err := os.WriteFile(playbookPath, playbookContent, 0644); err != nil {
 		log.Fatalf("Failed to write playbook: %v", err)
 	}
-	log.Printf("Playbook extracted to: %s", playbookPath)
+
+	// Extract roles directory
+	rolesDir := filepath.Join(tempDir, "roles")
+	if err := extractEmbeddedDir(playbookFS, "ansible/roles", rolesDir); err != nil {
+		log.Fatalf("Failed to extract roles: %v", err)
+	}
+	log.Printf("Roles extracted to: %s", rolesDir)
 
 	// Step 4: Run Ansible playbook
 	log.Println("\n[Step 4/4] Running hardening playbook...")
