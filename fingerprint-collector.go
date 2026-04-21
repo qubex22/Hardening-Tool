@@ -1,3 +1,6 @@
+//go:build fingerprint
+// +build fingerprint
+
 // fingerprint-collector: A standalone tool to collect device fingerprints for authorization
 //
 // Usage:

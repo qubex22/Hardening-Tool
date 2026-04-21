@@ -30,7 +30,7 @@ go build -ldflags="-s -w" -o harden-sles15.bin .
 # Step 4: Compile fingerprint-collector standalone
 echo ""
 echo "[4/4] Compiling fingerprint-collector..."
-go build -o fingerprint-collector ./fingerprint-collector.go
+go build -tags fingerprint -o fingerprint-collector ./fingerprint-collector.go
 
 # Summary
 echo ""

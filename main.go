@@ -88,10 +88,14 @@ func runHardening(playbookPath string) error {
 	}
 
 	// Run the embedded playbook with local connection
-	result, err := ansible_runner.New(playbookPath,
+	r, err := ansible_runner.New(playbookPath,
 		ansible_runner.WithConnection("local"),
 		ansible_runner.WithVerbosity(2), // -vv
-	).Run()
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create runner: %w", err)
+	}
+	result, err := r.Run()
 
 	if err != nil {
 		return fmt.Errorf("playbook execution failed: %w", err)
