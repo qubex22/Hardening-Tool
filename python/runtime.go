@@ -33,7 +33,7 @@ func New() (*PythonRuntime, error) {
 	return r, nil
 }
 
-// ensureAnsible installs ansible-core into the embedded Python runtime
+// ensureAnsible installs ansible-core into the embedded Python runtime from bundled packages
 func (r *PythonRuntime) ensureAnsible() error {
 	pythonExe := r.ep.GetExePath()
 	if _, err := os.Stat(pythonExe); err != nil {
@@ -47,49 +47,11 @@ func (r *PythonRuntime) ensureAnsible() error {
 		return nil
 	}
 
-	// Check if pip exists
-	pipCheck := exec.Command(pythonExe, "-m", "pip", "--version")
-	if pipCheck.Run() == nil {
-		fmt.Println("pip already available.")
-	} else {
-		// Download get-pip.py and bootstrap pip
-		fmt.Println("Bootstrapping pip via get-pip.py...")
-		getPipUrl := "https://bootstrap.pypa.io/get-pip.py"
-		getPipCmd := exec.Command(pythonExe, "-c", fmt.Sprintf(
-			"import urllib.request; urllib.request.urlretrieve(%q, '/tmp/get-pip.py')", getPipUrl))
-		if _, err := getPipCmd.CombinedOutput(); err != nil {
-			// Try http fallback
-			getPipUrl = "http://bootstrap.pypa.io/get-pip.py"
-			getPipCmd = exec.Command(pythonExe, "-c", fmt.Sprintf(
-				"import urllib.request; urllib.request.urlretrieve(%q, '/tmp/get-pip.py')", getPipUrl))
-			if _, err := getPipCmd.CombinedOutput(); err != nil {
-				return fmt.Errorf("failed to download get-pip.py: %w", err)
-			}
-		}
-		installPipCmd := exec.Command(pythonExe, "/tmp/get-pip.py", "--quiet")
-		if output, err := installPipCmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("failed to install pip: %w: %s", err, string(output))
-		}
-		fmt.Println("pip bootstrapped successfully.")
+	// Install from bundled packages (no network required)
+	if err := InstallBundledAnsible(r.ep.GetExtractedPath()); err != nil {
+		return fmt.Errorf("failed to install bundled ansible: %w", err)
 	}
 
-	// Install ansible-core
-	fmt.Println("Installing ansible-core...")
-	installCmd := exec.Command(pythonExe, "-m", "pip", "install", "--quiet", "ansible-core")
-	if output, err := installCmd.CombinedOutput(); err != nil {
-		fmt.Printf("pip install output: %s\n", string(output))
-		return fmt.Errorf("pip install ansible-core failed: %w", err)
-	}
-
-	// Install required ansible collections
-	fmt.Println("Installing ansible collections...")
-	collectionDir := filepath.Join(r.ep.GetExtractedPath(), "lib", "ansible_collections")
-	galaxyCmd := exec.Command(pythonExe, "-m", "ansible-galaxy", "collection", "install", "ansible.posix", "--collections-path", collectionDir, "--ignore-certs")
-	if output, err := galaxyCmd.CombinedOutput(); err != nil {
-		fmt.Printf("ansible-galaxy output: %s\n", string(output))
-		return fmt.Errorf("failed to install ansible collections: %w", err)
-	}
-	fmt.Println("Ansible collections installed successfully.")
 	return nil
 }
 
