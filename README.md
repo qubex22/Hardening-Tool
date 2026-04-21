@@ -145,6 +145,36 @@ harden-sles15/
 └── .github/workflows/
 ```
 
+## Adding Your Playbooks
+
+The binary embeds playbook files at compile time. Before building, place your playbook files in the following locations:
+
+| File | Purpose |
+|------|---------|
+| `ansible/playbook.yml` | Top-level playbook that gets embedded into the binary |
+| `ansible/roles/` | Ansible role directories (tasks, handlers, templates, defaults, vars) |
+| `authorized_fingerprints.txt` | Device whitelist (one SHA256 hash per line) |
+
+### Example: Adding a Custom Playbook
+
+1. Create or edit `ansible/playbook.yml` with your hardening tasks.
+2. Add any roles under `ansible/roles/` following the standard Ansible role structure:
+   ```
+   ansible/roles/your_role/
+   ├── tasks/main.yml
+   ├── handlers/main.yml
+   ├── templates/
+   ├── defaults/main.yml
+   └── vars/
+   ```
+3. Build the binary — all files in `ansible/` are automatically embedded by Go's `//go:embed` directive.
+
+```bash
+docker build --output . -f Dockerfile.build .
+```
+
+> **Note:** The current `playbook.yml` is a placeholder (hello world). Replace it with your actual hardening playbook before deploying.
+
 ## Build Requirements
 
 | Tool | Version |
