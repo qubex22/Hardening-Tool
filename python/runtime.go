@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/kluctl/go-embed-python/python"
 )
@@ -15,16 +16,54 @@ type PythonRuntime struct {
 	ep *python.EmbeddedPython
 }
 
-// New initializes the embedded Python runtime
+// New initializes the embedded Python runtime and installs ansible if needed
 func New() (*PythonRuntime, error) {
 	ep, err := python.NewEmbeddedPython("harden_sles15")
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize embedded Python: %w", err)
 	}
 
-	return &PythonRuntime{
-		ep: ep,
-	}, nil
+	r := &PythonRuntime{ep: ep}
+
+	// Install ansible-core into the embedded Python if not already present
+	if err := r.ensureAnsible(); err != nil {
+		return nil, fmt.Errorf("failed to install ansible: %w", err)
+	}
+
+	return r, nil
+}
+
+// ensureAnsible installs ansible-core into the embedded Python runtime
+func (r *PythonRuntime) ensureAnsible() error {
+	pythonExe := r.ep.GetExePath()
+	if _, err := os.Stat(pythonExe); err != nil {
+		return fmt.Errorf("embedded Python not found at %s", pythonExe)
+	}
+
+	// Check if ansible is already installed
+	checkCmd := exec.Command(pythonExe, "-c", "import ansible; print(ansible.__version__)")
+	if output, err := checkCmd.CombinedOutput(); err == nil {
+		fmt.Printf("Ansible %s already installed.\n", strings.TrimSpace(string(output)))
+		return nil
+	}
+
+	// Upgrade pip first
+	fmt.Println("Installing pip...")
+	pipCmd := exec.Command(pythonExe, "-m", "ensurepip", "--upgrade")
+	if output, err := pipCmd.CombinedOutput(); err != nil {
+		fmt.Printf("ensurepip warning: %s\n", string(output))
+	}
+
+	// Install ansible-core
+	fmt.Println("Installing ansible-core...")
+	installCmd := exec.Command(pythonExe, "-m", "pip", "install", "--quiet", "ansible-core")
+	if output, err := installCmd.CombinedOutput(); err != nil {
+		fmt.Printf("pip install output: %s\n", string(output))
+		return fmt.Errorf("pip install ansible-core failed: %w", err)
+	}
+
+	fmt.Println("Ansible installed successfully.")
+	return nil
 }
 
 // RunScript executes a Python script using the embedded runtime
