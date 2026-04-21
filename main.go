@@ -21,21 +21,23 @@ var playbookFS embed.FS
 
 // extractEmbeddedDir extracts a directory from the embedded filesystem to disk
 func extractEmbeddedDir(f embed.FS, src, dst string) error {
+	src = filepath.ToSlash(src)
 	return fs.WalkDir(f, src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		rel, err := filepath.Rel(src, filepath.ToSlash(path))
+		if err != nil {
+			return err
+		}
+		outPath := filepath.Join(dst, rel)
 		if d.IsDir() {
-			if err := os.MkdirAll(filepath.Join(dst, path), 0755); err != nil {
-				return err
-			}
-			return nil
+			return os.MkdirAll(outPath, 0755)
 		}
 		content, err := f.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		outPath := filepath.Join(dst, path)
 		if err := os.MkdirAll(filepath.Dir(outPath), 0755); err != nil {
 			return err
 		}
