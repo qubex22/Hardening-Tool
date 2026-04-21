@@ -10,9 +10,6 @@
   serial: 1
 
   pre_tasks:
-    - name: Verify system is reachable
-      ping:
-
     - name: Display system information
       debug:
         msg: |
