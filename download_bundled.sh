@@ -14,8 +14,13 @@ trap "rm -rf $TMPDIR_BUILD" EXIT
 python3 -m venv "$TMPDIR_BUILD/venv"
 . "$TMPDIR_BUILD/venv/bin/activate"
 
-# Download ansible-core and all dependencies as wheels
-echo "Downloading ansible-core wheels..."
+# Install ansible-core into the venv (so ansible-galaxy is available)
+# Then also download wheels for offline embedding
+echo "Installing ansible-core into venv..."
+pip install --no-cache-dir ansible-core
+
+# Download all dependency wheels for embedding
+echo "Downloading wheels..."
 pip wheel --wheel-dir "$TMPDIR_BUILD/wheels" --no-cache-dir ansible-core
 
 # Download ansible.posix collection using the same venv's ansible-galaxy
