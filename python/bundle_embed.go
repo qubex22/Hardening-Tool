@@ -27,10 +27,6 @@ func InstallBundledAnsible(pythonDir string) error {
 	// Extract bundled files to temp dir (skip .placeholder files)
 	// go:embed bundled embeds with "bundled/" prefix, e.g. "bundled/ansible_core.whl"
 	rootPath := "bundled"
-	if _, err := bundledFS.Stat(rootPath); err != nil {
-		// Fallback: try root "." in case embed changed
-		rootPath = "."
-	}
 	if err := fs.WalkDir(bundledFS, rootPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -140,11 +136,8 @@ func installBundledCollections(pythonExe, tmpDir, collectionDir string) error {
 
 // ensureAnsiblePosixCollection extracts and installs the bundled ansible.posix collection
 func ensureAnsiblePosixCollection(pythonExe, pythonDir string) error {
-	// Determine the root path in the embedded FS
+	// go:embed bundled embeds with "bundled/" prefix
 	rootPath := "bundled"
-	if _, err := bundledFS.Stat(rootPath); err != nil {
-		rootPath = "."
-	}
 
 	// List all embedded files for debugging
 	allFiles := []string{}
