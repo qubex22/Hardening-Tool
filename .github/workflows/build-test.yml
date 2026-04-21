@@ -67,8 +67,8 @@ jobs:
           file: ./Dockerfile.build
           tags: ${{ env.IMAGE_NAME }}:latest
           outputs: type=local,dest=./docker-output
-          cache-from: type:gha
-          cache-to: type:gha,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
