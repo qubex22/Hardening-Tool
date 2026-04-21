@@ -25,7 +25,7 @@ pip wheel --wheel-dir "$TMPDIR_BUILD/wheels" --no-cache-dir ansible-core
 
 # Download ansible.posix collection using the same venv's ansible-galaxy
 echo "Downloading ansible.posix collection..."
-GALAXY_OUTPUT=$(ansible-galaxy collection install ansible.posix --roles-path "$TMPDIR_BUILD/galaxy" 2>&1) || {
+GALAXY_OUTPUT=$(ansible-galaxy collection install ansible.posix --collections-path "$TMPDIR_BUILD/galaxy" 2>&1) || {
     echo "ansible-galaxy output: $GALAXY_OUTPUT"
     echo "ERROR: Failed to download ansible.posix collection"
     exit 1
