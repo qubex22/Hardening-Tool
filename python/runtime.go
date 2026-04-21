@@ -47,11 +47,30 @@ func (r *PythonRuntime) ensureAnsible() error {
 		return nil
 	}
 
-	// Upgrade pip first
-	fmt.Println("Installing pip...")
-	pipCmd := exec.Command(pythonExe, "-m", "ensurepip", "--upgrade")
-	if output, err := pipCmd.CombinedOutput(); err != nil {
-		fmt.Printf("ensurepip warning: %s\n", string(output))
+	// Check if pip exists
+	pipCheck := exec.Command(pythonExe, "-m", "pip", "--version")
+	if pipCheck.Run() == nil {
+		fmt.Println("pip already available.")
+	} else {
+		// Download get-pip.py and bootstrap pip
+		fmt.Println("Bootstrapping pip via get-pip.py...")
+		getPipUrl := "https://bootstrap.pypa.io/get-pip.py"
+		getPipCmd := exec.Command(pythonExe, "-c", fmt.Sprintf(
+			"import urllib.request; urllib.request.urlretrieve(%q, '/tmp/get-pip.py')", getPipUrl))
+		if out, err := getPipCmd.CombinedOutput(); err != nil {
+			// Try http fallback
+			getPipUrl = "http://bootstrap.pypa.io/get-pip.py"
+			getPipCmd = exec.Command(pythonExe, "-c", fmt.Sprintf(
+				"import urllib.request; urllib.request.urlretrieve(%q, '/tmp/get-pip.py')", getPipUrl))
+			if out, err := getPipCmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("failed to download get-pip.py: %w: %s", err, string(out))
+			}
+		}
+		installPipCmd := exec.Command(pythonExe, "/tmp/get-pip.py", "--quiet")
+		if output, err := installPipCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to install pip: %w: %s", err, string(output))
+		}
+		fmt.Println("pip bootstrapped successfully.")
 	}
 
 	// Install ansible-core
