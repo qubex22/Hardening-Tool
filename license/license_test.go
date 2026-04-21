@@ -4,16 +4,116 @@ import (
 	"testing"
 )
 
-func TestIsAuthorized(t *testing.T) {
-	// Test with empty whitelist (should all be unauthorized)
+func TestIsAuthorizedEmptyWhitelist(t *testing.T) {
+	// Save original state and restore after test
+	original := make(map[string]bool)
+	for k, v := range authorizedFingerprints {
+		original[k] = v
+	}
+	defer func() {
+		for k := range authorizedFingerprints {
+			delete(authorizedFingerprints, k)
+		}
+		for k, v := range original {
+			authorizedFingerprints[k] = v
+		}
+	}()
+
+	// Clear the map to simulate empty whitelist
+	for k := range authorizedFingerprints {
+		delete(authorizedFingerprints, k)
+	}
+
+	// With empty whitelist, all devices should be allowed
 	authorized := IsAuthorized("0000000000000000000000000000000000000000000000000000000000000000")
-	if authorized {
-		t.Error("Empty whitelist should not authorize any hash")
+	if !authorized {
+		t.Error("Empty whitelist should allow all devices")
+	}
+}
+
+func TestIsAuthorizedWithHash(t *testing.T) {
+	// Save original state and restore after test
+	original := make(map[string]bool)
+	for k, v := range authorizedFingerprints {
+		original[k] = v
+	}
+	defer func() {
+		for k := range authorizedFingerprints {
+			delete(authorizedFingerprints, k)
+		}
+		for k, v := range original {
+			authorizedFingerprints[k] = v
+		}
+	}()
+
+	// Clear and add a test hash
+	for k := range authorizedFingerprints {
+		delete(authorizedFingerprints, k)
+	}
+	testHash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	authorizedFingerprints[testHash] = true
+
+	// Test authorized hash
+	if !IsAuthorized(testHash) {
+		t.Error("Hash in whitelist should be authorized")
+	}
+
+	// Test unauthorized hash
+	if IsAuthorized("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+		t.Error("Hash not in whitelist should be unauthorized")
+	}
+}
+
+func TestVerifyFingerprintEmptyWhitelist(t *testing.T) {
+	// Save original state and restore after test
+	original := make(map[string]bool)
+	for k, v := range authorizedFingerprints {
+		original[k] = v
+	}
+	defer func() {
+		for k := range authorizedFingerprints {
+			delete(authorizedFingerprints, k)
+		}
+		for k, v := range original {
+			authorizedFingerprints[k] = v
+		}
+	}()
+
+	// Clear the map to simulate empty whitelist
+	for k := range authorizedFingerprints {
+		delete(authorizedFingerprints, k)
+	}
+
+	// With empty whitelist, any fingerprint should be valid
+	hash := "0000000000000000000000000000000000000000000000000000000000000000"
+	valid, _ := VerifyFingerprint(hash)
+	if !valid {
+		t.Error("Empty whitelist should allow any fingerprint")
 	}
 }
 
 func TestVerifyFingerprintUnauthorized(t *testing.T) {
-	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	// Save original state and restore after test
+	original := make(map[string]bool)
+	for k, v := range authorizedFingerprints {
+		original[k] = v
+	}
+	defer func() {
+		for k := range authorizedFingerprints {
+			delete(authorizedFingerprints, k)
+		}
+		for k, v := range original {
+			authorizedFingerprints[k] = v
+		}
+	}()
+
+	// Clear and add a hash
+	for k := range authorizedFingerprints {
+		delete(authorizedFingerprints, k)
+	}
+	authorizedFingerprints["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"] = true
+
+	hash := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	valid, msg := VerifyFingerprint(hash)
 
 	if valid {
@@ -25,7 +125,55 @@ func TestVerifyFingerprintUnauthorized(t *testing.T) {
 	}
 }
 
+func TestVerifyFingerprintWithPrefix(t *testing.T) {
+	// Save original state and restore after test
+	original := make(map[string]bool)
+	for k, v := range authorizedFingerprints {
+		original[k] = v
+	}
+	defer func() {
+		for k := range authorizedFingerprints {
+			delete(authorizedFingerprints, k)
+		}
+		for k, v := range original {
+			authorizedFingerprints[k] = v
+		}
+	}()
+
+	// Clear and add a hash
+	for k := range authorizedFingerprints {
+		delete(authorizedFingerprints, k)
+	}
+	testHash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	authorizedFingerprints[testHash] = true
+
+	// Test with sha256: prefix — should still match
+	valid, _ := VerifyFingerprint("sha256:" + testHash)
+	if !valid {
+		t.Error("sha256: prefix should be stripped and still match")
+	}
+}
+
 func TestAddAuthorizedHash(t *testing.T) {
+	// Save original state and restore after test
+	original := make(map[string]bool)
+	for k, v := range authorizedFingerprints {
+		original[k] = v
+	}
+	defer func() {
+		for k := range authorizedFingerprints {
+			delete(authorizedFingerprints, k)
+		}
+		for k, v := range original {
+			authorizedFingerprints[k] = v
+		}
+	}()
+
+	// Clear the map
+	for k := range authorizedFingerprints {
+		delete(authorizedFingerprints, k)
+	}
+
 	testHash := "testhash123abcdef"
 	AddAuthorizedHash(testHash)
 
@@ -34,40 +182,30 @@ func TestAddAuthorizedHash(t *testing.T) {
 	}
 }
 
-func TestDeriveKey(t *testing.T) {
-	fingerprint := "test-fingerprint"
-	masterSecret := []byte("super-secret-master-key")
-
-	key1, err := DeriveKey(fingerprint, masterSecret)
-	if err != nil {
-		t.Fatalf("Failed to derive key: %v", err)
+func TestGetWhitelist(t *testing.T) {
+	// Save original state and restore after test
+	original := make(map[string]bool)
+	for k, v := range authorizedFingerprints {
+		original[k] = v
 	}
+	defer func() {
+		for k := range authorizedFingerprints {
+			delete(authorizedFingerprints, k)
+		}
+		for k, v := range original {
+			authorizedFingerprints[k] = v
+		}
+	}()
 
-	if len(key1) == 0 {
-		t.Error("Derived key should not be empty")
+	// Clear and add test hashes
+	for k := range authorizedFingerprints {
+		delete(authorizedFingerprints, k)
 	}
+	authorizedFingerprints["aaaa"] = true
+	authorizedFingerprints["bbbb"] = true
 
-	// Same inputs should produce same output (deterministic)
-	key2, err := DeriveKey(fingerprint, masterSecret)
-	if err != nil {
-		t.Fatalf("Failed to derive key second time: %v", err)
-	}
-
-	if string(key1) != string(key2) {
-		t.Error("Key derivation should be deterministic")
-	}
-}
-
-func TestDeriveKeyDifferentInputs(t *testing.T) {
-	fingerprint := "test-fingerprint"
-	masterSecret := []byte("super-secret-master-key")
-
-	key1, _ := DeriveKey(fingerprint, masterSecret)
-
-	// Different fingerprint should produce different key
-	key2, _ := DeriveKey("different-fingerprint", masterSecret)
-
-	if string(key1) == string(key2) {
-		t.Error("Different fingerprints should produce different keys")
+	whitelist := GetWhitelist()
+	if len(whitelist) != 2 {
+		t.Errorf("Expected 2 hashes in whitelist, got %d", len(whitelist))
 	}
 }

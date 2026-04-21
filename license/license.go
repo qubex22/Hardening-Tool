@@ -6,16 +6,44 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"embed"
 	"encoding/base64"
 	"fmt"
+	"os"
 	"strings"
 )
 
+//go:embed authorized_fingerprints.txt
+var whitelistFS embed.FS
+
 // authorizedFingerprints is a whitelist of authorized device fingerprint hashes.
 // The hash is the raw SHA256 hex string (64 hex chars) as produced by fingerprint.Collect().
-// In production, this should be loaded from an encrypted configuration or external source.
-var authorizedFingerprints = map[string]bool{
-	// Add raw SHA256 hex hashes here (e.g., "a1b2c3d4...") after computing with fingerprint-collector
+// Populated at init() from the embedded authorized_fingerprints.txt file.
+// If the file is empty (no fingerprints), all devices are allowed (no license check).
+var authorizedFingerprints = map[string]bool{}
+
+func init() {
+	data, err := whitelistFS.ReadFile("authorized_fingerprints.txt")
+	if err != nil {
+		// Fallback: try reading from disk (for development)
+		data, err = os.ReadFile("authorized_fingerprints.txt")
+		if err != nil {
+			// File not found — allow all devices
+			return
+		}
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// Strip sha256: prefix if present
+		hash := strings.TrimPrefix(line, "sha256:")
+		authorizedFingerprints[hash] = true
+	}
 }
 
 // EncryptedAssets holds information about encrypted playbook data
@@ -26,6 +54,10 @@ type EncryptedAssets struct {
 
 // IsAuthorized checks if the device fingerprint is on the whitelist
 func IsAuthorized(fingerprintHash string) bool {
+	// If no fingerprints are configured, allow all (no license check)
+	if len(authorizedFingerprints) == 0 {
+		return true
+	}
 	_, authorized := authorizedFingerprints[fingerprintHash]
 	return authorized
 }
@@ -54,27 +86,23 @@ func DeriveKey(fingerprint string, masterSecret []byte) ([]byte, error) {
 
 // DecryptAESGCM decrypts data using AES-256-GCM with a derived key
 func DecryptAESGCM(encryptedData string, fingerprint string, masterSecret []byte) ([]byte, error) {
-	// Decode the base64-encoded encrypted data
 	data, err := base64.StdEncoding.DecodeString(encryptedData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode data: %w", err)
 	}
 
-	// Derive key from fingerprint
 	key, err := DeriveKey(fingerprint, masterSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	// Extract nonce (first 12 bytes) and ciphertext
 	if len(data) < aes.BlockSize+12 {
 		return nil, fmt.Errorf("encrypted data too short")
 	}
 	nonce := data[:12]
 	ciphertext := data[12:]
 
-	// Create AES-GCM cipher
-	block, err := aes.NewCipher(key[:32]) // AES-256 requires 32-byte key
+	block, err := aes.NewCipher(key[:32])
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
 	}
@@ -84,7 +112,6 @@ func DecryptAESGCM(encryptedData string, fingerprint string, masterSecret []byte
 		return nil, fmt.Errorf("failed to create GCM: %w", err)
 	}
 
-	// Decrypt
 	plaintext, err := aesgcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return nil, fmt.Errorf("decryption failed: %w", err)
@@ -110,7 +137,6 @@ func EncryptAESGCM(plaintext []byte, fingerprint string, masterSecret []byte) (s
 		return "", fmt.Errorf("failed to create GCM: %w", err)
 	}
 
-	// Generate cryptographically secure nonce
 	nonce := make([]byte, 12)
 	if _, err := rand.Read(nonce); err != nil {
 		return "", fmt.Errorf("failed to generate nonce: %w", err)
@@ -118,7 +144,6 @@ func EncryptAESGCM(plaintext []byte, fingerprint string, masterSecret []byte) (s
 
 	ciphertext := aesgcm.Seal(nil, nonce, plaintext, nil)
 
-	// Prepend nonce and encode as base64
 	result := make([]byte, len(nonce)+len(ciphertext))
 	copy(result[:12], nonce)
 	copy(result[12:], ciphertext)

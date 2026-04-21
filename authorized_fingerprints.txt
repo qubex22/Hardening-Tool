@@ -1,0 +1,3 @@
+# Authorized device fingerprints (one SHA256 hash per line)
+# Add hashes submitted by customers to authorize devices.
+# Leave empty to allow all devices (no license check).
