@@ -22,28 +22,9 @@ RUN chmod +x build.sh
 
 # Download and bundle ansible-core wheels and ansible.posix collection
 # This step requires internet but only runs at build time
-RUN apt-get install -y bash && \
-    mkdir -p python/bundled && \
-    TMPDIR_BUILD=$(mktemp -d) && \
-    python3 -m venv "$TMPDIR_BUILD/venv" && \
-    . "$TMPDIR_BUILD/venv/bin/activate" && \
-    pip wheel --wheel-dir "$TMPDIR_BUILD/wheels" --no-cache-dir ansible-core && \
-    ansible-galaxy collection install ansible.posix --roles-path "$TMPDIR_BUILD/galaxy" || true && \
-    if [ -d "$TMPDIR_BUILD/galaxy/ansible_collections/ansible/posix" ]; then \
-        mkdir -p "$TMPDIR_BUILD/galaxy/tarball" && \
-        cp -r "$TMPDIR_BUILD/galaxy/ansible_collections" "$TMPDIR_BUILD/galaxy/tarball/" && \
-        cd "$TMPDIR_BUILD/galaxy/tarball" && \
-        tar -czf "$TMPDIR_BUILD/ansible-posix.tar.gz" ansible_collections/ && \
-        cd /build && \
-        cp "$TMPDIR_BUILD/ansible-posix.tar.gz" python/bundled/ && \
-        echo "ansible.posix collection bundled"; \
-    else \
-        echo "WARNING: ansible.posix collection download failed"; \
-    fi && \
-    cp "$TMPDIR_BUILD/wheels"/* python/bundled/ 2>/dev/null || true && \
-    . "$TMPDIR_BUILD/venv/bin/deactivate" && \
-    rm -rf "$TMPDIR_BUILD" && \
-    echo "Bundled packages:" && ls -lh python/bundled/
+COPY download_bundled.sh .
+RUN chmod +x download_bundled.sh && \
+    bash ./download_bundled.sh /build/python/bundled
 
 # Run the build
 RUN ./build.sh
